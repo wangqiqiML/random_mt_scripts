@@ -1,0 +1,351 @@
+#!/usr/bin/env python
+
+import numpy as np
+import csv
+import os,sys
+import matplotlib.patches as patches
+from matplotlib.collections import PatchCollection
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import matplotlib.colors as colors
+import decimal
+
+
+class Sense(object):
+
+	def __init__(self,rho_path = None,project_name = None,synth_res = None, dat_path = None):
+
+		self.project_name = project_name
+
+ 		self.rho_path = os.getcwd() + '/' + rho_path + '.rho'
+
+ 		self.synth_res = synth_res
+
+ 		self.dat_path = os.getcwd() + '/' + dat_path + '.dat'
+
+ 	def read_ws(self):
+
+ 		ws_obj = open(self.rho_path,'rb')
+ 		ws_csv = csv.reader(ws_obj,delimiter = ' ')
+ 		self.ws_data = []
+ 		for row in ws_csv:
+ 			self.ws_data.append(row)
+ 		for row in range(0,len(self.ws_data)):
+ 			self.ws_data[row] = filter(None,self.ws_data[row])
+
+
+ 		ws_str_obj = open(self.rho_path,'rb')
+ 		ws_str_csv = csv.reader(ws_str_obj)
+ 		self.ws_str = []
+ 		for row in ws_str_csv:
+ 			self.ws_str.append(row)
+
+ 		self.x_num = float(self.ws_data[1][0])
+ 		self.y_num = float(self.ws_data[1][1])
+ 		self.z_num = float(self.ws_data[1][2])
+
+ 		self.x_grid = self.ws_data[2]
+ 		self.y_grid = self.ws_data[3]
+ 		self.z_grid = self.ws_data[4]
+
+		self.x_grid = [float(i) for i in self.x_grid]
+		self.y_grid = [float(i) for i in self.y_grid]
+		self.z_grid = [float(i) for i in self.z_grid]
+
+ 		self.lenxgrid = len(self.x_grid)
+ 		self.lenygrid = len(self.y_grid)
+ 		self.lenzgrid = len(self.z_grid)
+
+		self.x_grid_cum = []
+		self.y_grid_cum = []
+		self.mid_point_x = int(len(self.x_grid) / 2.0)
+		self.mid_point_y = int(len(self.y_grid) / 2.0)
+
+		self.z_grid_cum = np.cumsum(self.z_grid)
+
+		if len(self.x_grid) %2 == 0:
+			self.mid_point_x = int(len(self.x_grid) / 2.0)
+			beg_x = np.sum(self.x_grid[:self.mid_point_x]) * -1
+
+		elif len(self.x_grid) %2 != 0:
+			self.mid_point_x = int(len(self.x_grid) / 2.0) + 1
+			beg_x = np.sum(self.x_grid[:self.mid_point_x]) * -1 + (self.x_grid[self.mid_point_x] / 2.0)
+
+		if len(self.y_grid) %2 == 0:
+			self.mid_point_y = int(len(self.y_grid) / 2.0)
+			beg_y = np.sum(self.y_grid[:self.mid_point_y]) * -1
+		elif len(self.y_grid) %2 != 0:
+			self.mid_point_y = int(len(self.y_grid) / 2.0) + 1
+			beg_y = np.sum(self.y_grid[:self.mid_point_y]) * -1 + (self.y_grid[self.mid_point_y] / 2.0)
+
+		self.x_grid_cum.append(beg_x)
+		for i in range(0,self.lenxgrid-1):
+			beg_x += self.x_grid[i]
+			self.x_grid_cum.append(beg_x)
+		self.y_grid_cum.append(beg_y)
+		for i in range(0,self.lenygrid-1):
+			beg_y += self.y_grid[i]
+			self.y_grid_cum.append(beg_y)
+
+		self.rectobj_list = []
+		x1list = []
+		self.x_grid_cum = self.x_grid_cum[::-1]
+		self.x_grid = self.x_grid[::-1]
+		for i in range(0,len(self.y_grid_cum)):
+			for j in range(0,len(self.x_grid_cum)):
+				x1 = self.y_grid_cum[i]
+				y1 = self.x_grid_cum[j]
+				x1list.append(x1)
+				rectobj = patches.Rectangle((x1,y1),self.y_grid[i],self.x_grid[j])
+				self.rectobj_list.append(rectobj)
+
+
+		self.min_x = np.amin(x1list)
+		self.max_x = np.amax(x1list)
+
+		self.min_y = np.amin(self.x_grid_cum)
+		self.max_y = np.amax(self.x_grid_cum)
+
+		lencol = len(self.ws_data[6])
+
+		self.ws_data = filter(None,self.ws_data)
+		lenrho = len(self.ws_data)
+
+		self.resistivity = []
+		for row in range(5,lenrho-2):
+			for col in range(0,lencol):
+				self.resistivity.append(np.exp(float(self.ws_data[row][col])))
+
+		self.resistivity_array_list = np.ones((int(self.z_num),int(self.x_num*self.y_num)))
+
+	def read_dats(self):
+
+		fileobj = open(self.dat_path,'rb')
+		filecsv = csv.reader(fileobj,delimiter = ' ')
+		data = []
+		for row in filecsv:
+			data.append(row)
+		self.lendata = len(data)
+		for row in range(0,self.lendata):
+			data[row] = filter(None,data[row])
+
+		dash_found = False
+
+		for row in range(8,len(data)):
+			if data[row][0] == '#' :
+				limitlines = row-1
+				dash_found = True
+
+		if dash_found == False:
+			limitlines = len(data)-1
+
+		self.station_names = []
+		self.frequencies = []
+		station_change_row = []
+		self.station_x_list = []
+		self.station_y_list = []
+		for row in range(8,limitlines):
+			if data[row][1] != data[row-1][1] :
+				station_name = data[row][1]
+				self.station_x = float(data[row][4])
+				self.station_x_list.append(self.station_x)
+				self.station_y = float(data[row][5])
+				self.station_y_list.append(self.station_y)
+				self.station_names.append(station_name)
+				change = row
+				station_change_row.append(change)
+				self.lenst = len(station_change_row)
+		station_change_row.append(limitlines)
+
+	def determine_z_first(self):
+
+		for posz in range(0,int(self.z_num)):
+
+			print('Loading the layer no:'+ str(posz))
+			start_res = (posz) * int(self.x_num) * int(self.y_num)
+			end_res = start_res + (int(self.x_num) * int(self.y_num))
+
+			self.res_array = []
+
+			for i in range(start_res,end_res):
+				self.res_array.append(self.resistivity[i])
+
+
+			self.resistivity_array_list[posz] = self.res_array
+
+
+		self.posz = 0
+
+	def plot_cov(self,posz = None):
+
+		self.posz = posz
+
+		self.res_array = np.asarray(self.resistivity_array_list[int(posz)])
+		p = PatchCollection(self.rectobj_list,linewidth = 1,norm=colors.LogNorm())
+		p.set_array(self.res_array)
+		p.set_cmap('jet_r')
+		p.set_clim([1,1e4])
+
+		fig, ax = plt.subplots()
+		ax.add_collection(p)
+		ax.set_xlim([self.min_y,self.max_y])
+		ax.set_ylim([self.min_x,self.max_x])
+		tick_spacing = 1
+		plt.colorbar(p,label = 'Log Resistivity')
+		#ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+		ax.set_xlabel('Longitude')
+		ax.set_ylabel('Latitude')
+		ax.tick_params(axis='both', which='major', labelsize=8)
+		ax.grid(which = 'both')
+		titlestr = 'Layer no : ' + str(posz) +' ... Depth = ' + str(self.z_grid_cum[int(posz)]) + 'm'
+		ax.set_title(titlestr)
+		for i in range(0,len(self.res_array),int(self.x_num)):
+			ax.text(self.y_grid_cum[i/int(self.x_num)],self.max_y + self.y_grid[-1],i,fontsize = 10,
+				color = 'k')
+		for j in range(0,len(self.x_grid_cum)):
+			ax.text(self.min_x,self.x_grid_cum[j],j,fontsize = 10,color = 'k')
+		ax.plot(self.station_y_list,self.station_x_list, '^', color = 'k')
+		plt.show()
+
+
+	def edit_to_anomaly(self,index = None,posz = None):
+
+		self.resistivity_array_list[int(posz)][index] = self.synth_res
+
+	def write_ws(self,filename_root = None):
+
+		self.ws_write = []
+		for i in range(0,int(self.z_num)):
+			for j in range(0,int(self.x_num*self.y_num)):
+				self.ws_write.append('%.5E' % decimal.Decimal(str(float(np.log(self.resistivity_array_list[i][j])))))
+
+
+		lenws_write = len(self.ws_write)
+		self.ws_writer_list = []
+		for row in range(0,5):
+			dummywsline = ''.join([self.ws_str[row][0],'\n'])
+			self.ws_writer_list.append(dummywsline)
+		self.ws_writer_list.append('\n')
+
+		self.x_num = int(self.x_num)
+		self.y_num = int(self.y_num)
+		self.z_num = int(self.z_num)
+
+		for i in range(0,lenws_write,self.x_num):
+			dummyline = []
+			for j in range(0,self.x_num):
+				dummyline.append(str(self.ws_write[i+j]))
+				dummyline.append('  ')
+			dummyline = ''.join(dummyline)
+			line = ''.join(['  ',dummyline,'\n'])
+			self.ws_writer_list.append(line)
+			if (i + self.x_num) % (self.x_num*self.y_num) == 0 and i!=0 and (i+self.x_num)!=lenws_write:
+				self.ws_writer_list.append('\n')
+
+
+		header = ''.join([self.ws_str[len(self.ws_str)-2][0],'\n'])
+		self.ws_writer_list.append(header)
+		header = ''.join([self.ws_str[len(self.ws_str)-1][0],'\n'])
+		self.ws_writer_list.append(header)
+		os.system("mkdir " + self.project_name)
+		complete_ws = os.path.join(os.getcwd() + '/' + self.project_name +'/', str(filename_root) + '.rho')
+		filesave2 = file(complete_ws,'w')
+		filesave2.writelines(self.ws_writer_list)
+		filesave2.close()
+
+		print('Saved the file as ' + filename_root + '.rho ' +  'at ' + os.getcwd() + '/'+self.project_name+'/')
+
+
+####SCRIPT####
+print('SENSE')
+print('  ')
+print(' --------------------------------------------------------')
+print('  ')
+print('S. Ozaydin,2017')
+print('   ')
+print('This program enables manipulation of the initial model for ModEM ')
+print('3D modeling algorithm.')
+print('  ')
+print('---------------------------------------------------------')
+print('  ')
+print('Input the .rho file name')
+rho_path_input = raw_input()
+print 'Input the .dat file name'
+dat_path_input = raw_input()
+print('What is the project name ?')
+project_name_inp = raw_input()
+print('Enter the resistivity value for the synthetic object.')
+synth_res_inp = raw_input()
+print('Enter the latitude center of the model...')
+aaa = Sense(rho_path = rho_path_input,
+	project_name = project_name_inp,synth_res = synth_res_inp,
+	dat_path = dat_path_input)
+aaa.read_ws()
+aaa.read_dats()
+aaa.determine_z_first()
+while True:
+	print('Which layer should we go ? For exit (type 000)')
+	answer = raw_input()
+	if answer == '000':
+		print('Goodbye')
+		break
+	elif int(answer) >= 0:
+		aaa.plot_cov(posz = answer)
+		print('                              ')
+		print('                              ')
+		print('What do you want to do with this layer ?')
+		print('----------------------------------------')
+		print('Type in the number')
+		print('1. Inject Anomaly')
+		print('2. Redo as previous layer.')
+		print('3. Back')
+		print('4. Save and exit')
+
+		answer2 = raw_input()
+
+		if answer2 == '1':
+
+			print('Enter the indexes of the changes, to exit the loop 000, to plot enter "plot" ')
+			memory_history = []
+			while True:
+				print('Enter an array ( 0:7 ), or single numbers ( 7 ).')
+				index = raw_input()
+				if index == '000':
+					print('Exiting index loop')
+					break
+				elif index =='plot':
+					aaa.plot_cov(posz = answer)
+				elif index.find(':') > 0:
+					indexpos = int(index.index(':'))
+					for i in range(int(index[0:indexpos]),int(index[indexpos+1:len(index)])):
+						aaa.edit_to_anomaly(posz = answer,index = int(i))
+					memory_history.append(index)
+				else:
+					aaa.edit_to_anomaly(posz = answer,index = int(index))
+					memory_history.append(index)
+			aaa.plot_cov(posz = answer)
+
+		elif answer2 == '2':
+
+			for memo in memory_history:
+				print memo
+				if memo.find(':') > 0:
+					indexpos = int(memo.index(':'))
+					for i in range(int(memo[0:indexpos]),int(memo[indexpos+1:len(memo)])):
+						aaa.edit_to_anomaly(posz = answer,index = int(i))
+				elif memo.find('plot') > 0:
+					pass
+				elif memo.find('000') > 0:
+					pass
+				else:
+					aaa.edit_to_anomaly(posz = answer,index = int(memo))
+			aaa.plot_cov(posz = answer)
+
+		elif answer2 == '4':
+
+			print(' Enter the filename root')
+			filename_root_input = raw_input()
+
+			aaa.write_ws(filename_root = filename_root_input)
+			print('Goodbye')
+			break

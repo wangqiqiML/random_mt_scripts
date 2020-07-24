@@ -1,0 +1,564 @@
+#!/usr/bin/env python
+
+import numpy as np
+import os,sys
+import csv
+import matplotlib.pyplot as plt
+
+sys.setrecursionlimit(1500)
+
+class ModEM_Multi_fit(object):
+
+	def __init__(self):
+
+		self.dat_list = [os.path.join(os.getcwd(),dat) for dat in os.listdir(os.getcwd()) if dat.find('.dat')>0]
+		self.dat_list.sort()
+		print str(len(self.dat_list)) + ' number of dat files are found:'
+		for i in self.dat_list:
+			print i
+
+		print('Do you want to continue ? y/n')
+		answer_cont = raw_input()
+		if answer_cont == 'y':
+			pass
+		else:
+			sys.quit()
+
+		self.mu = 4.0 * np.pi * 10**(-7)  #CGS
+		self.sfac = np.sqrt((4.0*np.pi*(10**(-7))*2.0*np.pi)/5.0) #Scaling Factor
+
+	def read_dats(self):
+
+		self.periodlist_model = []
+		self.freqlist_model = []
+		self.rhoxxlist_global_model = []
+		self.rhoxylist_global_model = []
+		self.rhoyxlist_global_model = []
+		self.rhoyylist_global_model = []
+		self.phasexxlist_global_model = []
+		self.phasexylist_global_model = []
+		self.phaseyxlist_global_model = []
+		self.phaseyylist_global_model = []
+		self.rhoxxerrlist_global_model = []
+		self.rhoxyerrlist_global_model = []
+		self.rhoyxerrlist_global_model = []
+		self.rhoyyerrlist_global_model = []
+		self.phasexxerrlist_global_model = []
+		self.phasexyerrlist_global_model = []
+		self.phaseyxerrlist_global_model = []
+		self.phaseyyerrlist_global_model = []
+
+
+		for dat_num in range(0,len(self.dat_list)):
+
+			fileobj = open(self.dat_list[dat_num],'rb')
+			filecsv = csv.reader(fileobj,delimiter = ' ')
+			data = []
+			for row in filecsv:
+				data.append(row)
+			self.lendata = len(data)
+			for row in range(0,self.lendata):
+				data[row] = filter(None,data[row])
+
+			dash_found = False
+
+			for row in range(8,len(data)):
+			    if data[row][0] == '#' :
+			        limitlines = row-1
+			        dash_found = True
+
+			if dash_found == False:
+				limitlines = len(data)-1
+
+			self.station_names = []
+			self.frequencies = []
+			station_change_row = []
+			for row in range(8,limitlines):
+				if data[row][1] != data[row-1][1] :
+					station_name = data[row][1]
+					self.station_names.append(station_name)
+					change = row
+					station_change_row.append(change)
+					self.lenst = len(station_change_row)
+			station_change_row.append(limitlines)
+
+
+			self.period_vals = []
+			self.freqlist = []
+			self.zxx_r_vals = []
+			self.zxx_i_vals = []
+			self.zxy_r_vals = []
+			self.zxy_i_vals = []
+			self.zyx_r_vals = []
+			self.zyx_i_vals = []
+			self.zyy_r_vals = []
+			self.zyy_i_vals = []
+
+			self.zxx_var_vals = []
+			self.zxy_var_vals = []
+			self.zyx_var_vals = []
+			self.zyy_var_vals = []
+
+			for i in range(0,self.lenst):
+				self.station_periodlist = []
+				self.station_freqlist = []
+				self.zxx_r_station_list = []
+				self.zxx_i_station_list = []
+				self.zxx_var_station_list = []
+				self.zxy_r_station_list = []
+				self.zxy_i_station_list = []
+				self.zxy_var_station_list = []
+				self.zyx_r_station_list = []
+				self.zyx_i_station_list = []
+				self.zyx_var_station_list = []
+				self.zyy_r_station_list = []
+				self.zyy_i_station_list = []
+				self.zyy_var_station_list = []
+
+				for row in range(station_change_row[i],station_change_row[i+1]):
+					if (row-8)%4 == 0:
+						period = float(data[row][0])
+						#print period
+						#print str(i) + '    iter no'
+						freq = 1.0 / (period)
+						self.station_periodlist.append(period)
+						self.station_freqlist.append(freq)
+					elif data[row][7] == 'ZYX':
+						zxx_r_station = float(data[row-2][8])
+						zxx_i_station = float(data[row-2][9])
+						zxx_var_station = float(data[row-2][10])
+						self.zxx_r_station_list.append(zxx_r_station)
+						self.zxx_i_station_list.append(zxx_i_station)
+						self.zxx_var_station_list.append(zxx_var_station)
+
+						zxy_r_station = float(data[row-1][8])
+						zxy_i_station = float(data[row-1][9])
+						zxy_var_station = float(data[row-1][10])
+						self.zxy_r_station_list.append(zxy_r_station)
+						self.zxy_i_station_list.append(zxy_i_station)
+						self.zxy_var_station_list.append(zxy_var_station)
+
+						zyx_r_station = float(data[row][8])
+						zyx_i_station = float(data[row][9])
+						zyx_var_station = float(data[row][10])
+						self.zyx_r_station_list.append(zyx_r_station)
+						self.zyx_i_station_list.append(zyx_i_station)
+						self.zyx_var_station_list.append(zyx_var_station)
+
+						zyy_r_station = float(data[row+1][8])
+						zyy_i_station = (float(data[row+1][9]))
+						zyy_var_station = float(data[row+1][10])
+						self.zyy_r_station_list.append(zyy_r_station)
+						self.zyy_i_station_list.append(zyy_i_station)
+						self.zyy_var_station_list.append(zyy_var_station)
+
+				#Sort frequencies
+				if dat_num > 0:
+					points = zip(self.station_periodlist,self.zxx_r_station_list,self.zxx_i_station_list, self.zxx_var_station_list,
+						self.zxy_r_station_list,self.zxy_i_station_list, self.zxy_var_station_list,
+						self.zyx_r_station_list,self.zyx_i_station_list, self.zyx_var_station_list,
+						self.zyy_r_station_list,self.zyy_i_station_list, self.zyy_var_station_list)
+					points = sorted(points, reverse = True)
+
+					self.station_periodlist = [point[0] for point in points]
+					self.zxx_r_station_list = [point[1] for point in points]
+					self.zxx_i_station_list = [point[2] for point in points]
+					self.zxx_var_station_list = [point[3] for point in points]
+					self.zxy_r_station_list = [point[4] for point in points]
+					self.zxy_i_station_list = [point[5] for point in points]
+					self.zxy_var_station_list = [point[6] for point in points]
+					self.zyx_r_station_list = [point[7] for point in points]
+					self.zyx_i_station_list = [point[8] for point in points]
+					self.zyx_var_station_list = [point[9] for point in points]
+					self.zyy_r_station_list = [point[10] for point in points]
+					self.zyy_i_station_list = [point[11] for point in points]
+					self.zyy_var_station_list = [point[12] for point in points]
+
+				self.zxx_r_vals.append(self.zxx_r_station_list)
+				self.zxx_i_vals.append(self.zxx_i_station_list)
+				self.zxx_var_vals.append(self.zxx_var_station_list)
+				self.zxy_r_vals.append(self.zxy_r_station_list)
+				self.zxy_i_vals.append(self.zxy_i_station_list)
+				self.zxy_var_vals.append(self.zxy_var_station_list)
+				self.zyx_r_vals.append(self.zyx_r_station_list)
+				self.zyx_i_vals.append(self.zyx_i_station_list)
+				self.zyx_var_vals.append(self.zyx_var_station_list)
+				self.zyy_r_vals.append(self.zyy_r_station_list)
+				self.zyy_i_vals.append(self.zyy_i_station_list)
+				self.zyy_var_vals.append(self.zyy_var_station_list)
+
+				self.period_vals.append(self.station_periodlist)
+
+				self.freqlist.append(1.0 / np.asarray(self.station_periodlist))
+				#print station_change_row[i],i
+
+			#Sort Values
+
+			self.station_num = len(self.station_names)
+
+			self.rhoxxlist_global = []
+			self.rhoxylist_global = []
+			self.rhoyxlist_global = []
+			self.rhoyylist_global = []
+			self.phasexxlist_global = []
+			self.phasexylist_global = []
+			self.phaseyxlist_global = []
+			self.phaseyylist_global = []
+			self.rhoxxerrlist_global = []
+			self.rhoxyerrlist_global = []
+			self.rhoyxerrlist_global = []
+			self.rhoyyerrlist_global = []
+			self.phasexxerrlist_global = []
+			self.phasexyerrlist_global = []
+			self.phaseyxerrlist_global = []
+			self.phaseyyerrlist_global = []
+
+			for i in range(0,self.station_num):
+				freqnumber = len(self.period_vals[i])
+				rhoxx_station = []
+				rhoxxerr_station = []
+				phsxx_station = []
+				phsxxerr_station = []
+
+				rhoxy_station = []
+				rhoxyerr_station = []
+				phsxy_station = []
+				phsxyerr_station = []
+
+				rhoyx_station = []
+				rhoyxerr_station = []
+				phsyx_station = []
+				phsyxerr_station = []
+
+				rhoyy_station = []
+				rhoyyerr_station = []
+				phsyy_station = []
+				phsyyerr_station = []
+
+				for j in range(0,freqnumber):
+					rhoxx_station.append(((self.sfac*self.zxx_r_vals[i][j])**2.0 + (self.sfac*self.zxx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.freqlist[i][j]))
+					rhoxy_station.append(((self.sfac*self.zxy_r_vals[i][j])**2.0 + (self.sfac*self.zxy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.freqlist[i][j]))
+					rhoyx_station.append(((self.sfac*self.zyx_r_vals[i][j])**2.0 + (self.sfac*self.zyx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.freqlist[i][j]))
+					rhoyy_station.append(((self.sfac*self.zyy_r_vals[i][j])**2.0 + (self.sfac*self.zyy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.freqlist[i][j]))
+
+					std_xx = np.sqrt(np.abs(self.zxx_var_vals[i][j]))
+					std_xy = np.sqrt(np.abs(self.zxy_var_vals[i][j]))
+					std_yx = np.sqrt(np.abs(self.zyx_var_vals[i][j]))
+					std_yy = np.sqrt(np.abs(self.zyy_var_vals[i][j]))
+
+					std_xx_p = np.sqrt(self.zxx_var_vals[i][j])
+					std_xy_p = np.sqrt(self.zxy_var_vals[i][j])
+					std_yx_p = np.sqrt(self.zyx_var_vals[i][j])
+					std_yy_p = np.sqrt(self.zyy_var_vals[i][j])
+
+					rhoxx_a = (np.abs(((self.zxx_r_vals[i][j] + std_xx) + (self.zxx_i_vals[i][j] + std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxx_b = (np.abs(((self.zxx_r_vals[i][j] + std_xx) + (self.zxx_i_vals[i][j] - std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxx_c = (np.abs(((self.zxx_r_vals[i][j] - std_xx) + (self.zxx_i_vals[i][j] + std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxx_d = (np.abs(((self.zxx_r_vals[i][j] - std_xx) + (self.zxx_i_vals[i][j] - std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+					rhoxy_a = (np.abs(((self.zxy_r_vals[i][j] + std_xy) + (self.zxy_i_vals[i][j] + std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxy_b = (np.abs(((self.zxy_r_vals[i][j] + std_xy) + (self.zxy_i_vals[i][j] - std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxy_c = (np.abs(((self.zxy_r_vals[i][j] - std_xy) + (self.zxy_i_vals[i][j] + std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoxy_d = (np.abs(((self.zxy_r_vals[i][j] - std_xy) + (self.zxy_i_vals[i][j] - std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+					rhoyx_a = (np.abs(((self.zyx_r_vals[i][j] + std_yx) + (self.zyx_i_vals[i][j] + std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyx_b = (np.abs(((self.zyx_r_vals[i][j] + std_yx) + (self.zyx_i_vals[i][j] - std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyx_c = (np.abs(((self.zyx_r_vals[i][j] - std_yx) + (self.zyx_i_vals[i][j] + std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyx_d = (np.abs(((self.zyx_r_vals[i][j] - std_yx) + (self.zyx_i_vals[i][j] - std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+					rhoyy_a = (np.abs(((self.zyy_r_vals[i][j] + std_yy) + (self.zyy_i_vals[i][j] + std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyy_b = (np.abs(((self.zyy_r_vals[i][j] + std_yy) + (self.zyy_i_vals[i][j] - std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyy_c = (np.abs(((self.zyy_r_vals[i][j] - std_yy) + (self.zyy_i_vals[i][j] + std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+					rhoyy_d = (np.abs(((self.zyy_r_vals[i][j] - std_yy) + (self.zyy_i_vals[i][j] - std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+					rxx = [rhoxx_a , rhoxx_b , rhoxx_c, rhoxx_d]
+					rxy = [rhoxy_a , rhoxy_b , rhoxy_c, rhoxy_d]
+					ryx = [rhoyx_a , rhoyx_b , rhoyx_c, rhoyx_d]
+					ryy = [rhoyy_a , rhoyy_b , rhoyy_c, rhoyy_d]
+
+					rhoxxerr_station.append((max(rxx) - min(rxx)) / 2.0)
+					rhoxyerr_station.append((max(rxy) - min(rxy)) / 2.0)
+					rhoyxerr_station.append((max(ryx) - min(ryx)) / 2.0)
+					rhoyyerr_station.append((max(ryy) - min(ryy)) / 2.0)
+
+					phsxx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxx_i_vals[i][j]) / (self.sfac*self.zxx_r_vals[i][j]))))
+					phsxy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxy_i_vals[i][j]) / (self.sfac*self.zxy_r_vals[i][j]))))
+					phsyx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyx_i_vals[i][j]) / (self.sfac*self.zyx_r_vals[i][j]))))
+					phsyy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyy_i_vals[i][j]) / (self.sfac*self.zyy_r_vals[i][j]))))
+
+
+					phsxx_a = (180.0 / np.pi) * (np.arctan((self.zxx_i_vals[i][j] + std_xx_p) / (self.zxx_r_vals[i][j] - std_xx_p)))
+					phsxx_b = (180.0 / np.pi) * (np.arctan((self.zxx_i_vals[i][j] - std_xx_p) / (self.zxx_r_vals[i][j] + std_xx_p)))
+
+					pxx = [phsxx_a,phsxx_b]
+
+					phsxy_a = (180.0 / np.pi) * (np.arctan((self.zxy_i_vals[i][j] + std_xy_p) / (self.zxy_r_vals[i][j] - std_xy_p)))
+					phsxy_b = (180.0 / np.pi) * (np.arctan((self.zxy_i_vals[i][j] - std_xy_p) / (self.zxy_r_vals[i][j] + std_xy_p)))
+
+					pxy = [phsxy_a,phsxy_b]
+
+					phsyx_a = (180.0 / np.pi) * (np.arctan((self.zyx_i_vals[i][j] + std_yx_p) / (self.zyx_r_vals[i][j] - std_yx_p)))
+					phsyx_b = (180.0 / np.pi) * (np.arctan((self.zyx_i_vals[i][j] - std_yx_p) / (self.zyx_r_vals[i][j] + std_yx_p)))
+
+					pyx = [phsyx_a, phsyx_b]
+
+					phsyy_a = (180.0 / np.pi) * (np.arctan((self.zyy_i_vals[i][j] + std_yy_p) / (self.zyy_r_vals[i][j] - std_yy_p)))
+					phsyy_b = (180.0 / np.pi) * (np.arctan((self.zyy_i_vals[i][j] - std_yy_p) / (self.zyy_r_vals[i][j] + std_yy_p)))
+
+					pyy = [phsyy_a, phsyy_b]
+
+					phsxxerr_station.append((max(pxx) - min(pxx)) / 2.0)
+					phsxyerr_station.append((max(pxy) - min(pxy)) / 2.0)
+					phsyxerr_station.append((max(pyx) - min(pyx)) / 2.0)
+					phsyyerr_station.append((max(pyy) - min(pyy)) / 2.0)
+
+
+				self.rhoxxlist_global.append(rhoxx_station)
+				self.rhoxylist_global.append(rhoxy_station)
+				self.rhoyxlist_global.append(rhoyx_station)
+				self.rhoyylist_global.append(rhoyy_station)
+				self.phasexxlist_global.append(phsxx_station)
+				self.phasexylist_global.append(phsxy_station)
+				self.phaseyxlist_global.append(phsyx_station)
+				self.phaseyylist_global.append(phsyy_station)
+
+				self.rhoxxerrlist_global.append(rhoxxerr_station)
+				self.rhoxyerrlist_global.append(rhoxyerr_station)
+				self.rhoyxerrlist_global.append(rhoyxerr_station)
+				self.rhoyyerrlist_global.append(rhoyyerr_station)
+
+				self.phasexxerrlist_global.append(phsxxerr_station)
+				self.phasexyerrlist_global.append(phsxyerr_station)
+				self.phaseyxerrlist_global.append(phsyxerr_station)
+				self.phaseyyerrlist_global.append(phsyyerr_station)
+
+
+
+			self.periodlist_model.append(self.period_vals)
+			self.freqlist_model.append(self.freqlist)
+			self.rhoxxlist_global_model.append(self.rhoxxlist_global)
+			self.rhoxylist_global_model.append(self.rhoxylist_global)
+			self.rhoyxlist_global_model.append(self.rhoyxlist_global)
+			self.rhoyylist_global_model.append(self.rhoyylist_global)
+			self.phasexxlist_global_model.append(self.phasexxlist_global)
+			self.phasexylist_global_model.append(self.phasexylist_global)
+			self.phaseyxlist_global_model.append(self.phaseyxlist_global)
+			self.phaseyylist_global_model.append(self.phaseyylist_global)
+
+			self.rhoxxerrlist_global_model.append(self.rhoxxerrlist_global)
+			self.rhoxyerrlist_global_model.append(self.rhoxyerrlist_global)
+			self.rhoyxerrlist_global_model.append(self.rhoyxerrlist_global)
+			self.rhoyyerrlist_global_model.append(self.rhoyyerrlist_global)
+
+			self.phasexxerrlist_global_model.append(self.phasexxerrlist_global)
+			self.phasexyerrlist_global_model.append(self.phasexyerrlist_global)
+			self.phaseyxerrlist_global_model.append(self.phaseyxerrlist_global)
+			self.phaseyyerrlist_global_model.append(self.phaseyyerrlist_global)
+
+
+	def plot(self):
+		colorlist = ['k', '#ab1d11','#411769','#247916','#d88b29','#d35400','#e2e224','k','#f9451e']
+		namelist = ['Data','Inversion','Test','1000', '100','3000','300','Trial #7']
+
+		for i in range(0,len(self.station_names)):
+			print(str(i) + '      -     ' + self.station_names[i])
+		print('Enter the first station to plot from if (type 000 to plot all)')
+		answer_entry = raw_input()
+		if answer_entry != '000':
+			answer_entry = int(answer_entry)
+			print('Enter the second station to plot from')
+			answer_end = int(input())
+		else:
+			answer_entry = 0
+			answer_end = len(self.freqlist_model[0])
+
+		print self.freqlist_model[0][0],self.rhoxylist_global_model[0][0]
+		for i in range(answer_entry,answer_end):
+		#for i in range(128,self.station_num):
+		#for i in range(150,self.station_num):
+			fig = plt.figure(figsize = (15,10))
+			ax1 = plt.subplot2grid((16,17),(0,0), rowspan = 4,colspan = 8)
+			ax2 = plt.subplot2grid((16,17),(4,0), rowspan = 3,colspan = 8)
+			ax3 = plt.subplot2grid((16,17),(9,0), rowspan = 4,colspan = 8)
+			ax4 = plt.subplot2grid((16,17),(13,0), rowspan = 3,colspan = 8)
+			ax5 = plt.subplot2grid((16,17),(0,9), rowspan = 4, colspan = 8)
+			ax6 = plt.subplot2grid((16,17),(4,9), rowspan = 3, colspan = 8)
+			ax7 = plt.subplot2grid((16,17),(9,9), rowspan = 4, colspan = 8)
+			ax8 = plt.subplot2grid((16,17),(13,9), rowspan = 3, colspan = 8)
+
+			#print len(self.rhoxxlist_global_model[i])
+
+			for j in range(0,len(self.dat_list)):
+
+				if j == 0:
+
+					ax1.errorbar(self.freqlist_model[j][i],self.rhoxxlist_global_model[j][i],yerr = [self.rhoxxerrlist_global_model[j][i],
+						self.rhoxxerrlist_global_model[j][i]],fmt = '^',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+					ax2.errorbar(self.freqlist_model[j][i],self.phasexxlist_global_model[j][i],yerr = [self.phasexxerrlist_global_model[j][i],
+						self.phasexxlist_global_model[j][i]],fmt = 'o',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+
+					ax5.errorbar(self.freqlist_model[j][i],self.rhoxylist_global_model[j][i],yerr = [self.rhoxyerrlist_global_model[j][i],
+						self.rhoxyerrlist_global_model[j][i]],fmt = '^',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+					ax6.errorbar(self.freqlist_model[j][i],self.phasexylist_global_model[j][i],yerr = [self.phasexyerrlist_global_model[j][i],
+						self.phasexyerrlist_global_model[j][i]],fmt = 'o',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+
+					ax3.errorbar(self.freqlist_model[j][i],self.rhoyxlist_global_model[j][i],yerr = [self.rhoyxerrlist_global_model[j][i],
+						self.rhoyxerrlist_global_model[j][i]],fmt = '^',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+					ax4.errorbar(self.freqlist_model[j][i],self.phaseyxlist_global_model[j][i],yerr = [self.phaseyxerrlist_global_model[j][i],
+						self.phaseyxerrlist_global_model[j][i]],fmt = 'o',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+
+					ax7.errorbar(self.freqlist_model[j][i],self.rhoyylist_global_model[j][i],yerr = [self.rhoyyerrlist_global_model[j][i],
+						self.rhoyyerrlist_global_model[j][i]],fmt = '^',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+					ax8.errorbar(self.freqlist_model[j][i],self.phaseyylist_global_model[j][i],yerr = [self.phaseyyerrlist_global_model[j][i],
+						self.phaseyyerrlist_global_model[j][i]],fmt = 'o',linewidth = 2, capthick = 2, ecolor = 'k',label = namelist[j], color = colorlist[j])
+
+
+				else:
+					markertype = '-s'
+					markertypephs = '-o'
+
+					ax5.plot(self.freqlist_model[j][i],self.rhoxylist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+
+					ax5.set_xscale('log')
+					ax5.set_yscale('log')
+					#ax1.grid(b = None, which = 'major')
+					ax5.invert_xaxis()
+					ax5.set_xticklabels([])
+					ax5.set_xlim((10**3,10**-5))
+					ax5.set_ylim((10**-2,10**5))
+					for tick in ax5.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax5.set_ylabel(r'$\rho_a$ ($\Omega$ m )')
+					ax5.set_title('XY')
+					ax5.legend(fontsize = 10,bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.1)
+					ax5.hold(True)
+
+
+
+					ax6.plot(self.freqlist_model[j][i],self.phasexylist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+					ax6.set_xscale('log')
+					#ax2.grid(b = None, which = 'major')
+					ax6.invert_xaxis()
+					ax6.set_xlim((10**3,10**-5))
+					#ax6.set_ylim((-10,100))
+					for tick in ax6.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax6.set_ylabel(r'$\phi^{\circ}$')
+					ax6.set_xlabel('Frequency [Hz]')
+					ax6.legend(fontsize = 10,bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.1)
+					ax6.hold(True)
+
+
+					ax7.plot(self.freqlist_model[j][i],self.rhoyylist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax7.set_xscale('log')
+					ax7.set_yscale('log')
+					#ax3.grid(b = None, which = 'major')
+					ax7.invert_xaxis()
+					ax7.set_xticklabels([])
+					ax7.set_xlim((10**3,10**-5))
+					ax7.set_ylim((10**-2,10**5))
+					for tick in ax7.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax7.set_ylabel(r'$\rho_a$ ($\Omega$ m )')
+					ax7.set_title('YY')
+					ax7.hold(True)
+
+
+					ax8.plot(self.freqlist_model[j][i],self.phaseyylist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax8.set_xscale('log')
+					#ax4.grid(b = None, which = 'major')
+					ax8.invert_xaxis()
+					ax8.set_xlim((10**3,10**-5))
+					#ax8.set_ylim((-250,250))
+					for tick in ax4.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax8.set_ylabel(r'$\phi^{\circ}$')
+					ax8.set_xlabel('Frequency [Hz]')
+					ax8.hold(True)
+
+
+					ax1.plot(self.freqlist_model[j][i],self.rhoxxlist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax1.set_xscale('log')
+					ax1.set_yscale('log')
+					#ax5.grid(b = None, which = 'major')
+					ax1.invert_xaxis()
+					ax1.set_xticklabels([])
+					ax1.set_xlim((10**3,10**-5))
+					ax1.set_ylim((10**-2,10**5))
+					for tick in ax1.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax1.set_ylabel(r'$\rho_a$ ($\Omega$ m )')
+					ax1.set_title('XX')
+					ax1.hold(True)
+
+					ax2.plot(self.freqlist_model[j][i],self.phasexxlist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax2.set_xscale('log')
+					#ax6.grid(b = None, which = 'major')
+					ax2.invert_xaxis()
+					ax2.set_xlim((10**3,10**-5))
+					#ax2.set_ylim((-250,250))
+					for tick in ax2.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax2.set_ylabel(r'$\phi^{\circ}$')
+					ax2.set_xlabel('Frequency [Hz]')
+					ax2.hold(True)
+
+					ax3.plot(self.freqlist_model[j][i],self.rhoyxlist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax3.set_xscale('log')
+					ax3.set_yscale('log')
+					#ax7.grid(b = None, which = 'major')
+					ax3.invert_xaxis()
+					ax3.set_xticklabels([])
+					ax3.set_xlim((10**3,10**-5))
+					ax3.set_ylim((10**-2,10**5))
+					for tick in ax3.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax3.set_ylabel(r'$\rho_a$ ($\Omega$ m )')
+					ax3.set_title('YX')
+					ax3.hold(True)
+
+
+					ax4.plot(self.freqlist_model[j][i],self.phaseyxlist_global_model[j][i],linewidth = 1.75,label = namelist[j],color = colorlist[j])
+
+					ax4.set_xscale('log')
+					#ax8.grid(b = None, which = 'major')
+					ax4.invert_xaxis()
+					ax4.set_xlim((10**3,10**-5))
+					#ax4.set_ylim((-10,100))
+					for tick in ax4.yaxis.get_major_ticks():
+					    tick.label.set_fontsize(10)
+					ax4.set_ylabel(r'$\phi^{\circ}$')
+					ax4.set_xlabel('Frequency [Hz]')
+					ax4.hold(True)
+
+					ax1.grid(which = 'major')
+					ax2.grid(which = 'major')
+					ax3.grid(which = 'major')
+					ax4.grid(which = 'major')
+					ax5.grid(which = 'major')
+					ax6.grid(which = 'major')
+					ax7.grid(which = 'major')
+					ax8.grid(which = 'major')
+
+			print i
+			print self.station_names[i]
+			fig.suptitle(self.station_names[i])
+
+			plt.savefig('FitTest_Station_' + self.station_names[i] + '.png',dpi = 300, edgecolor = 'none' )
+			print 'Saved Figure at ' + str(self.station_names[i]) + os.getcwd()
+
+
+
+
+
+####SCRIPT####
+aaa = ModEM_Multi_fit()
+aaa.read_dats()
+aaa.plot()
+####END OF CODE####

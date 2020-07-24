@@ -1,0 +1,833 @@
+#!/usr/bin/env python
+
+import numpy as np
+import csv
+import os,sys
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.colors as colors
+
+print 'A program that plots the strike angles of given edi data.'
+
+plt.style.use('ggplot')
+
+class Plot_Rose(object):
+
+	def __init__(self):
+
+		self.edi_list = [os.path.join(os.getcwd(),edi) for edi in os.listdir(os.getcwd()) if edi.find('.edi')>0]
+		self.edi_list.sort()
+		print(str(len(self.edi_list)) + ' stations are found.')
+		print('Do you want to continue ? y/n')
+		prim_answer = raw_input()
+		if prim_answer == 'y':
+			pass
+		else:
+			print("Bye.")
+			sys.exit()
+
+		self.edi_path = os.getcwd()
+
+		self.mu = 4.0 * np.pi * 10**(-7)  #CGS
+		self.sfac = np.sqrt((4.0*np.pi*(10**(-7))*2.0*np.pi)/5.0) #Scaling Factor
+
+		self.file_names = []
+		for i in range(0,len(self.edi_list)):
+			self.file_names.append(self.edi_list[i][self.edi_list[i].rfind('/')+1:-4])
+
+	def read_edis(self):
+
+		###----------EDI PART----------###
+		#Searching for edi files and appending them to a list.
+		self.edi_list = [os.path.join(os.getcwd(),edi) for edi in os.listdir(os.getcwd()) if edi.find('.edi')>0]
+		if len(self.edi_list) == 0:
+			print('Warning : There are no edi files in the current direction.')
+			sys.exit()
+		self.edi_list.sort()
+
+		#Creating empty arrays for information.
+		self.station_lon_list = []
+		self.station_lat_list = []
+		self.lat_degrees_list = []
+		self.lon_degrees_list = []
+		self.station_name_list = []
+		self.station_num = len(self.edi_list)
+		edi_data = []
+		self.title_list = []
+		for i in range(0,self.station_num):
+			self.title_list.append('Station No : ' + str(i + 1))
+		index_freq_list = []
+		index_imp_list = []
+		index_elev_list = []
+
+		index_zxx_r_list = []
+		index_zxx_i_list = []
+		index_zxx_var_list = []
+		index_zxy_r_list = []
+		index_zxy_i_list = []
+		index_zxy_var_list = []
+		index_zyx_r_list = []
+		index_zyx_i_list = []
+		index_zyx_var_list = []
+		index_zyy_r_list = []
+		index_zyy_i_list = []
+		index_zyy_var_list = []
+		index_rho_rot_list = []
+
+		index_rhoxy_list = []
+		index_rhoxyerr_list = []
+		index_rhoyx_list = []
+		index_rhoyxerr_list = []
+		index_rhoxx_list = []
+		index_rhoxxerr_list = []
+		index_rhoyy_list = []
+		index_rhoyyerr_list = []
+
+		index_phsxy_list = []
+		index_phsxyerr_list = []
+		index_phsyx_list = []
+		index_phsyxerr_list = []
+		index_phsxx_list = []
+		index_phsxxerr_list = []
+		index_phsyy_list = []
+		index_phsyyerr_list = []
+		index_trot_list = []
+
+		index_tx_r_list = []
+		index_tx_i_list = []
+		index_tx_var_list = []
+		index_ty_r_list = []
+		index_ty_i_list = []
+		index_ty_var_list = []
+		index_tipmag_list = []
+
+		self.period_vals = []
+		self.frequency_vals = []
+		self.rhoxy_vals = []
+		self.rhoxyerr_vals = []
+		self.rhoyx_vals = []
+		self.rhoyxerr_vals = []
+		self.rhoxx_vals = []
+		self.rhoxxerr_vals = []
+		self.rhoyy_vals = []
+		self.rhoyyerr_vals = []
+		self.phsxy_vals = []
+		self.phsxyerr_vals = []
+		self.phsyx_vals = []
+		self.phsyxerr_vals = []
+		self.phsxx_vals = []
+		self.phsxxerr_vals = []
+		self.phsyy_vals = []
+		self.phsyyerr_vals = []
+
+		self.zxx_r_vals = []
+		self.zxx_i_vals = []
+		self.zxx_var_vals = []
+		self.zxy_r_vals = []
+		self.zxy_i_vals = []
+		self.zxy_var_vals = []
+		self.zyx_r_vals = []
+		self.zyx_i_vals = []
+		self.zyx_var_vals = []
+		self.zyy_r_vals = []
+		self.zyy_i_vals = []
+		self.zyy_var_vals = []
+
+		self.elev_global = []
+
+
+		#Reading in the edis for every station represented by "i" iterative number.
+
+		for i in range(0,self.station_num):
+
+			edi_obj = open(self.edi_list[i],'rb')
+			edi_csv = csv.reader(edi_obj,delimiter = ' ')
+			data_station = []
+			for row in edi_csv:
+				data_station.append(row)
+			edilendata = len(data_station)
+
+			for j in range(0,edilendata):
+				data_station[j] = filter(None,data_station[j])
+
+			data_station = filter(None,data_station)
+
+			edi_data.append(data_station)
+			edilendata = len(data_station)
+
+
+			self.edi_type = 0
+
+			#Searching for the data positions in individual edi files.
+			index_id_list = []
+			for k in range(0,edilendata):
+
+				if data_station[k][0] == '>FREQ':
+					index_freq = k
+				elif data_station[k][0] == '>!****FREQUENCIES****!':
+					self.edi_type =+ 1
+				elif data_station[k][0][:6] == 'DATAID':
+					index_id = k
+					index_id_list.append(index_id)
+				elif data_station[k][0][:6] == 'REFLAT':
+					index_lat = k
+				elif data_station[k][0][:7] == 'REFLONG':
+					index_long = k
+					if len(data_station[k]) == 1:
+						index_help = 0
+					else:
+						index_help = 1
+				elif data_station[k][0][:7] == 'REFELEV':
+					index_elev = k
+				elif data_station[k][0] == '>ZROT':
+					index_imp = k
+				elif data_station[k][0] == '>ZXXR':
+					index_zxx_r = k
+				elif data_station[k][0] == '>ZXXI':
+					index_zxx_i = k
+				elif data_station[k][0] == '>ZXX.VAR':
+					index_zxx_var = k
+				elif data_station[k][0] == '>ZXYR':
+					index_zxy_r = k
+				elif data_station[k][0] == '>ZXYI':
+					index_zxy_i = k
+				elif data_station[k][0] == '>ZXY.VAR':
+					index_zxy_var = k
+				elif data_station[k][0] == '>ZYXR':
+					index_zyx_r = k
+				elif data_station[k][0] == '>ZYXI':
+					index_zyx_i = k
+				elif data_station[k][0] == '>ZYX.VAR':
+					index_zyx_var = k
+				elif data_station[k][0] == '>ZYYR':
+					index_zyy_r = k
+				elif data_station[k][0] == '>ZYYI':
+					index_zyy_i = k
+				elif data_station[k][0] == '>ZYY.VAR':
+					index_zyy_var = k
+
+
+			#if self.stupid_latitude == 0:
+			self.station_lat_list.append(data_station[index_lat][0][7:])
+			if index_help == 0:
+				self.station_lon_list.append(data_station[index_long][0][8:])
+			else:
+				self.station_lon_list.append(data_station[index_long][1])
+
+			latitude_string_find = [pos for pos, char in enumerate(self.station_lat_list[i]) if char == ':']
+			longitude_string_find = [pos for pos, char in enumerate(self.station_lon_list[i]) if char == ':']
+
+			deg = float(self.station_lat_list[i][0:latitude_string_find[0]])
+			minute = float(self.station_lat_list[i][latitude_string_find[0]+1:latitude_string_find[1]]) / 60.0
+			second = float(self.station_lat_list[i][latitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lat = round(deg - minute - second,5)
+			else:
+				lat = round(deg + minute + second,5)
+			self.lat_degrees_list.append(lat)
+			deg = float(self.station_lon_list[i][0:longitude_string_find[0]])
+			minute = float(self.station_lon_list[i][longitude_string_find[0]+1:longitude_string_find[1]]) / 60.0
+			second = float(self.station_lon_list[i][longitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lon = round(deg - minute - second,5)
+			else:
+				lon = round(deg + minute + second,5)
+			self.lon_degrees_list.append(lon)
+
+			self.station_name_list.append(data_station[index_id][0][8:len(data_station[1][0])-1])
+
+			print('Reading in the edi :' +  str(self.file_names[i]))
+			print '#################################'
+
+			index_freq_list.append(index_freq)
+			index_zxx_r_list.append(index_zxx_r)
+			index_zxx_i_list.append(index_zxx_i)
+			index_zxx_var_list.append(index_zxx_var)
+			index_zxy_r_list.append(index_zxy_r)
+			index_zxy_i_list.append(index_zxy_i)
+			index_zxy_var_list.append(index_zxy_var)
+			index_zyx_r_list.append(index_zyx_r)
+			index_zyx_i_list.append(index_zyx_i)
+			index_zyx_var_list.append(index_zyx_var)
+			index_zyy_r_list.append(index_zyy_r)
+			index_zyy_i_list.append(index_zyy_i)
+			index_zyy_var_list.append(index_zyy_var)
+
+			index_imp_list.append(index_imp)
+
+			frequency_station = []
+			freq_station = []
+			zxx_r_station = []
+			zxx_i_station = []
+			zxx_var_station = []
+			zxy_r_station = []
+			zxy_i_station = []
+			zxy_var_station = []
+			zyx_r_station = []
+			zyx_i_station = []
+			zyx_var_station = []
+			zyy_r_station = []
+			zyy_i_station = []
+			zyy_var_station = []
+
+			if self.edi_type > 0:
+				addition_to_search = 1
+			else:
+				addition_to_search = 0
+
+			#Appending the data to local and global lists.
+
+			#FREQUENCIES
+			for index in range(index_freq_list[i]+1,index_imp_list[i] - addition_to_search):
+				for index2 in data_station[index]:
+					frequency_station.append(float(index2))
+					freq_station.append(1.0/float(index2))
+			self.period_vals.append(frequency_station)
+			self.frequency_vals.append(freq_station)
+
+
+			#Calculate the index jump
+			index_jump = index_imp_list[i] - index_freq_list[i] - addition_to_search
+
+			#IMPEDANCES
+
+			for index in range(index_zxx_r_list[i]+1,index_zxx_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_r_station.append(float(index2))
+			self.zxx_r_vals.append(zxx_r_station)
+
+			for index in range(index_zxx_i_list[i]+1,index_zxx_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_i_station.append(float(index2))
+			self.zxx_i_vals.append(zxx_i_station)
+
+			for index in range(index_zxx_var_list[i]+1,index_zxx_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_var_station.append(float(index2))
+			self.zxx_var_vals.append(zxx_var_station)
+
+			for index in range(index_zxy_r_list[i]+1,index_zxy_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_r_station.append(float(index2))
+			self.zxy_r_vals.append(zxy_r_station)
+
+			for index in range(index_zxy_i_list[i]+1,index_zxy_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_i_station.append(float(index2))
+			self.zxy_i_vals.append(zxy_i_station)
+
+			for index in range(index_zxy_var_list[i]+1,index_zxy_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_var_station.append(float(index2))
+			self.zxy_var_vals.append(zxy_var_station)
+
+			for index in range(index_zyx_r_list[i]+1,index_zyx_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_r_station.append(float(index2))
+			self.zyx_r_vals.append(zyx_r_station)
+
+			for index in range(index_zyx_i_list[i]+1,index_zyx_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_i_station.append(float(index2))
+			self.zyx_i_vals.append(zyx_i_station)
+
+			for index in range(index_zyx_var_list[i]+1,index_zyx_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_var_station.append(float(index2))
+			self.zyx_var_vals.append(zyx_var_station)
+
+			for index in range(index_zyy_r_list[i]+1,index_zyy_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_r_station.append(float(index2))
+			self.zyy_r_vals.append(zyy_r_station)
+
+			for index in range(index_zyy_i_list[i]+1,index_zyy_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_i_station.append(float(index2))
+			self.zyy_i_vals.append(zyy_i_station)
+
+			for index in range(index_zyy_var_list[i]+1,index_zyy_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_var_station.append(float(index2))
+			self.zyy_var_vals.append(zyy_var_station)
+
+			period_index = []
+			var_index = []
+			for j in range(0,len(self.period_vals[i])):
+
+				if self.zxx_r_vals[i][j] > 1e10:
+					period_index.append(self.period_vals[i][j])
+					var_index.append(j)
+			var_index = var_index[::-1]
+
+			def remove_from_list(the_list,val):
+				while val in the_list:
+					the_list.remove(val)
+
+			for period_element in period_index:
+				remove_from_list(self.period_vals[i],period_element)
+
+			for var_element in var_index:
+
+				del self.zxx_r_vals[i][var_element]
+				del self.zxx_i_vals[i][var_element]
+				del self.zxx_var_vals[i][var_element]
+				del self.zxy_r_vals[i][var_element]
+				del self.zxy_i_vals[i][var_element]
+				del self.zxy_var_vals[i][var_element]
+				del self.zyx_r_vals[i][var_element]
+				del self.zyx_i_vals[i][var_element]
+				del self.zyx_var_vals[i][var_element]
+				del self.zyy_r_vals[i][var_element]
+				del self.zyy_i_vals[i][var_element]
+				del self.zyy_var_vals[i][var_element]
+		
+			###CALCULATING APP. RES AND PHASE VALUES
+
+			freqnumber = len(self.period_vals[i])
+			rhoxy_station = []
+			rhoxyerr_station = []
+			rhoyx_station = []
+			rhoyxerr_station = []
+			rhoxx_station = []
+			rhoxxerr_station = []
+			rhoyy_station = []
+			rhoyyerr_station = []
+			phsxy_station = []
+			phsxyerr_station = []
+			phsyx_station = []
+			phsyxerr_station = []
+			phsxx_station = []
+			phsxxerr_station = []
+			phsyy_station = []
+			phsyyerr_station = []
+
+			for j in range(0,freqnumber):
+
+				rhoxx_station.append(((self.sfac*self.zxx_r_vals[i][j])**2.0 + (self.sfac*self.zxx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoxy_station.append(((self.sfac*self.zxy_r_vals[i][j])**2.0 + (self.sfac*self.zxy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoyx_station.append(((self.sfac*self.zyx_r_vals[i][j])**2.0 + (self.sfac*self.zyx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoyy_station.append(((self.sfac*self.zyy_r_vals[i][j])**2.0 + (self.sfac*self.zyy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				
+				std_xx = np.sqrt(np.abs(self.zxx_var_vals[i][j]))
+				std_xy = np.sqrt(np.abs(self.zxy_var_vals[i][j]))
+				std_yx = np.sqrt(np.abs(self.zyx_var_vals[i][j]))
+				std_yy = np.sqrt(np.abs(self.zyy_var_vals[i][j]))
+
+				std_xx_p = np.sqrt(self.zxx_var_vals[i][j])
+				std_xy_p = np.sqrt(self.zxy_var_vals[i][j])
+				std_yx_p = np.sqrt(self.zyx_var_vals[i][j])
+				std_yy_p = np.sqrt(self.zyy_var_vals[i][j])
+
+
+				rhoxx_a = (np.abs(((self.zxx_r_vals[i][j] + std_xx) + (self.zxx_i_vals[i][j] + std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxx_b = (np.abs(((self.zxx_r_vals[i][j] + std_xx) + (self.zxx_i_vals[i][j] - std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxx_c = (np.abs(((self.zxx_r_vals[i][j] - std_xx) + (self.zxx_i_vals[i][j] + std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxx_d = (np.abs(((self.zxx_r_vals[i][j] - std_xx) + (self.zxx_i_vals[i][j] - std_xx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+				rhoxy_a = (np.abs(((self.zxy_r_vals[i][j] + std_xy) + (self.zxy_i_vals[i][j] + std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxy_b = (np.abs(((self.zxy_r_vals[i][j] + std_xy) + (self.zxy_i_vals[i][j] - std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxy_c = (np.abs(((self.zxy_r_vals[i][j] - std_xy) + (self.zxy_i_vals[i][j] + std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoxy_d = (np.abs(((self.zxy_r_vals[i][j] - std_xy) + (self.zxy_i_vals[i][j] - std_xy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+				rhoyx_a = (np.abs(((self.zyx_r_vals[i][j] + std_yx) + (self.zyx_i_vals[i][j] + std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyx_b = (np.abs(((self.zyx_r_vals[i][j] + std_yx) + (self.zyx_i_vals[i][j] - std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyx_c = (np.abs(((self.zyx_r_vals[i][j] - std_yx) + (self.zyx_i_vals[i][j] + std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyx_d = (np.abs(((self.zyx_r_vals[i][j] - std_yx) + (self.zyx_i_vals[i][j] - std_yx)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+				rhoyy_a = (np.abs(((self.zyy_r_vals[i][j] + std_yy) + (self.zyy_i_vals[i][j] + std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyy_b = (np.abs(((self.zyy_r_vals[i][j] + std_yy) + (self.zyy_i_vals[i][j] - std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyy_c = (np.abs(((self.zyy_r_vals[i][j] - std_yy) + (self.zyy_i_vals[i][j] + std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+				rhoyy_d = (np.abs(((self.zyy_r_vals[i][j] - std_yy) + (self.zyy_i_vals[i][j] - std_yy)*1j))) ** 2.0 / (0.7958 * 2.0 * np.pi * self.period_vals[i][j])
+
+				rxx = [rhoxx_a , rhoxx_b , rhoxx_c, rhoxx_d]
+				rxy = [rhoxy_a , rhoxy_b , rhoxy_c, rhoxy_d]
+				ryx = [rhoyx_a , rhoyx_b , rhoyx_c, rhoyx_d]
+				ryy = [rhoyy_a , rhoyy_b , rhoyy_c, rhoyy_d]
+
+				rhoxxerr_station.append((max(rxx) - min(rxx)) / 2.0)
+				rhoxyerr_station.append((max(rxy) - min(rxy)) / 2.0)
+				rhoyxerr_station.append((max(ryx) - min(ryx)) / 2.0)
+				rhoyyerr_station.append((max(ryy) - min(ryy)) / 2.0)
+
+				phsxx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxx_i_vals[i][j]) / (self.sfac*self.zxx_r_vals[i][j]))))
+				phsxy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxy_i_vals[i][j]) / (self.sfac*self.zxy_r_vals[i][j]))))
+
+				phsyx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyx_i_vals[i][j]) / (self.sfac*self.zyx_r_vals[i][j]))))
+				phsyy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyy_i_vals[i][j]) / (self.sfac*self.zyy_r_vals[i][j]))))
+
+
+				phsxx_a = (180.0 / np.pi) * (np.arctan((self.zxx_i_vals[i][j] + std_xx_p) / (self.zxx_r_vals[i][j] - std_xx_p)))
+				phsxx_b = (180.0 / np.pi) * (np.arctan((self.zxx_i_vals[i][j] - std_xx_p) / (self.zxx_r_vals[i][j] + std_xx_p)))
+
+				pxx = [phsxx_a,phsxx_b]
+
+				phsxy_a = (180.0 / np.pi) * (np.arctan((self.zxy_i_vals[i][j] + std_xy_p) / (self.zxy_r_vals[i][j] - std_xy_p)))
+				phsxy_b = (180.0 / np.pi) * (np.arctan((self.zxy_i_vals[i][j] - std_xy_p) / (self.zxy_r_vals[i][j] + std_xy_p)))
+
+				pxy = [phsxy_a,phsxy_b]
+
+				phsyx_a = (180.0 / np.pi) * (np.arctan((self.zyx_i_vals[i][j] + std_yx_p) / (self.zyx_r_vals[i][j] - std_yx_p)))
+				phsyx_b = (180.0 / np.pi) * (np.arctan((self.zyx_i_vals[i][j] - std_yx_p) / (self.zyx_r_vals[i][j] + std_yx_p)))
+
+				pyx = [phsyx_a, phsyx_b]
+
+				phsyy_a = (180.0 / np.pi) * (np.arctan((self.zyy_i_vals[i][j] + std_yy_p) / (self.zyy_r_vals[i][j] - std_yy_p)))
+				phsyy_b = (180.0 / np.pi) * (np.arctan((self.zyy_i_vals[i][j] - std_yy_p) / (self.zyy_r_vals[i][j] + std_yy_p)))
+
+				pyy = [phsyy_a, phsyy_b]
+				
+				phsxxerr_station.append((max(pxx) - min(pxx)) / 2.0)
+				phsxyerr_station.append((max(pxy) - min(pxy)) / 2.0)
+				phsyxerr_station.append((max(pyx) - min(pyx)) / 2.0)
+				phsyyerr_station.append((max(pyy) - min(pyy)) / 2.0)
+
+			self.rhoxx_vals.append(rhoxx_station)
+			self.rhoxy_vals.append(rhoxy_station)
+			self.rhoyx_vals.append(rhoyx_station)
+			self.rhoyy_vals.append(rhoyy_station)
+
+			self.phsxx_vals.append(phsxx_station)
+			self.phsxy_vals.append(phsxy_station)
+			self.phsyx_vals.append(phsyx_station)
+			self.phsyy_vals.append(phsyy_station)
+
+			self.rhoxxerr_vals.append(rhoxxerr_station)
+			self.rhoxyerr_vals.append(rhoxyerr_station)
+			self.rhoyxerr_vals.append(rhoyxerr_station)
+			self.rhoyyerr_vals.append(rhoyyerr_station)
+
+			self.phsxxerr_vals.append(phsxxerr_station)
+			self.phsxyerr_vals.append(phsxyerr_station)
+			self.phsyxerr_vals.append(phsyxerr_station)
+			self.phsyyerr_vals.append(phsyyerr_station)
+
+
+	def calculate_phase_tensor_invariants(self):
+
+		#Calculating phase tensor invariants for individual frequencies and stations.
+		#Creating empty arrays for global invariant lists.
+		self.phi_xx_vals = []
+		self.phi_xy_vals = []
+		self.phi_yx_vals = []
+		self.phi_yy_vals = []
+		self.beta_list = []
+		self.alpha_list = []
+		self.azimuth_list = []
+		self.phi_rot_list = []
+		self.phi_max_list = []
+		self.phi_min_list = []
+		self.landa_list = []
+		self.anis_hint_list = []
+		self.period_vals_pt = np.asarray(self.period_vals)
+		self.distorted_frequencies_global = []
+
+
+		for i in range(0,self.station_num):
+			#Creating empty arrays for local invariant lists.
+			lenfreq = len(self.period_vals_pt[i])
+			phi_xx_list = []
+			phi_xy_list = []
+			phi_yx_list = []
+			phi_yy_list = []
+			det_x_list = []
+			beta = []
+			alpha = []
+			pi_1 = []
+			pi_2 = []
+			a_check = 0
+			distorted_frequencies = []
+			#searching for each individual frequency with "j".
+			for j in range(0,lenfreq):
+				det_x_list.append((self.zxx_r_vals[i][j] * self.zyy_r_vals[i][j]) - (self.zxy_r_vals[i][j] * self.zyx_r_vals[i][j]))
+				if det_x_list[j] == 0.0:
+					a_check = a_check + 1
+					phi_xx_list.append(-999)
+					phi_yy_list.append(-999)
+					phi_xy_list.append(-999)
+					phi_yx_list.append(-999)
+					beta.append(-999)
+					alpha.append(-999)
+					pi_1.append(-999)
+					pi_2.append(-999)
+					distorted_frequencies.append(self.period_vals_pt[i][j])
+					self.period_vals_pt[i][j] = -999
+				else:
+					phi_xx_list.append(((self.zyy_r_vals[i][j] * self.zxx_i_vals[i][j]) - (self.zxy_r_vals[i][j] * self.zyx_i_vals[i][j])) / det_x_list[j])
+					phi_xy_list.append(((self.zyy_r_vals[i][j] * self.zxy_i_vals[i][j]) - (self.zxy_r_vals[i][j] * self.zyy_i_vals[i][j])) / det_x_list[j])
+					phi_yx_list.append(((self.zxx_r_vals[i][j] * self.zyx_i_vals[i][j]) - (self.zyx_r_vals[i][j] * self.zxx_i_vals[i][j])) / det_x_list[j])
+					phi_yy_list.append(((self.zxx_r_vals[i][j] * self.zyy_i_vals[i][j]) - (self.zyx_r_vals[i][j] * self.zxy_i_vals[i][j])) / det_x_list[j])
+
+					#CALCULATING INVARIANTS
+					beta.append(np.rad2deg(0.5 * np.arctan2( (phi_xy_list[j] - phi_yx_list[j]), (phi_xx_list[j] + phi_yy_list[j]))))
+					alpha.append(np.rad2deg(0.5 * np.arctan2( (phi_xy_list[j] + phi_yx_list[j]), (phi_xx_list[j] - phi_yy_list[j]))))
+					pi_1.append(np.rad2deg(0.5 * np.sqrt((phi_xx_list[j] - phi_yy_list[j])**2.0 + (phi_xy_list[j] + phi_yx_list[j])**2.0)))
+					pi_2.append(np.rad2deg(0.5 * np.sqrt((phi_xx_list[j] + phi_yy_list[j])**2.0 + (phi_xy_list[j] - phi_yx_list[j])**2.0)))
+
+			if a_check > 0.0:
+				phi_xx_list = [elem for elem in phi_xx_list if elem != -999]
+				phi_yy_list = [elem for elem in phi_yy_list if elem != -999]
+				phi_xy_list = [elem for elem in phi_xy_list if elem != -999]
+				phi_yx_list = [elem for elem in phi_yx_list if elem != -999]
+				beta = [elem for elem in beta if elem != -999]
+				alpha = [elem for elem in alpha if elem != -999]
+				pi_1 = [elem for elem in pi_1 if elem != -999]
+				pi_2 = [elem for elem in pi_2 if elem != -999]
+				self.period_vals_pt[i] = np.asarray([elem for elem in self.period_vals_pt[i] if elem != -999])
+
+
+			beta = np.asarray(beta)
+			alpha = np.asarray(alpha)
+			azimuth = alpha - beta
+			pi_1 = np.asarray(pi_1)
+			pi_2 = np.asarray(pi_2)
+			phi_min = pi_2 - pi_1
+			phi_max = pi_2 + pi_1
+			landa = (phi_max - phi_min) / (phi_max + phi_min)
+			anis_hint = phi_max - phi_min
+
+			#Appending local variables to global lists.
+			self.distorted_frequencies_global.append(distorted_frequencies)
+			self.azimuth_list.append(azimuth)
+			self.phi_xx_vals.append(phi_xx_list)
+			self.phi_xy_vals.append(phi_xy_list)
+			self.phi_yx_vals.append(phi_yx_list)
+			self.phi_yy_vals.append(phi_yy_list)
+			self.beta_list.append(beta)
+			self.alpha_list.append(alpha)
+			self.phi_max_list.append(phi_max)
+			self.phi_min_list.append(phi_min)
+			self.landa_list.append(landa)
+			self.anis_hint_list.append(anis_hint)
+
+
+
+	def select_freq(self):
+
+		allperiods = []
+		for i in range(0,len(self.period_vals)):
+			for j in range(0,len(self.period_vals[i])):
+				allperiods.append(self.period_vals[i][j])
+		allperiods = list(set(allperiods))
+		allperiods.sort()
+
+
+
+		from scipy.interpolate import Akima1DInterpolator
+
+		print('Enter the array of frequencies as in [entry1, entry2, entry3, ... ]')
+		self.approx_array = input()
+
+		self.approx_array_list = []
+
+		self.zxx_r_vals_interp = []
+		self.zxy_r_vals_interp = []
+		self.zyx_r_vals_interp = []
+		self.zyy_r_vals_interp = []
+
+		self.zxx_i_vals_interp = []
+		self.zxy_i_vals_interp = []
+		self.zyx_i_vals_interp = []
+		self.zyy_i_vals_interp = []
+
+		self.index_periods_global = []
+		self.period_vals_interp = []
+
+		for i in range(0,self.station_num):
+			self.approx_arrayy = []
+			for j in range(0,len(self.approx_array)):
+				self.approx_arrayy.append(self.approx_array[j])
+			self.approx_array_list.append(self.approx_arrayy)
+
+		for i in range(0,self.station_num):				
+			for element in self.approx_array:
+				if (element < min(self.period_vals[i])) or ((element > max(self.period_vals[i]))): 
+					del self.approx_array_list[i][self.approx_array_list[i].index(element)]
+
+
+		for i in range(0,self.station_num):
+
+			f_zxx_r = Akima1DInterpolator(self.period_vals[i],self.zxx_r_vals[i])
+			f_zxy_r = Akima1DInterpolator(self.period_vals[i],self.zxy_r_vals[i])
+			f_zyx_r = Akima1DInterpolator(self.period_vals[i],self.zyx_r_vals[i])
+			f_zyy_r = Akima1DInterpolator(self.period_vals[i],self.zyy_r_vals[i])
+
+			f_zxx_i = Akima1DInterpolator(self.period_vals[i],self.zxx_i_vals[i])
+			f_zxy_i = Akima1DInterpolator(self.period_vals[i],self.zxy_i_vals[i])
+			f_zyx_i = Akima1DInterpolator(self.period_vals[i],self.zyx_i_vals[i])
+			f_zyy_i = Akima1DInterpolator(self.period_vals[i],self.zyy_i_vals[i])
+
+			
+			self.zxx_r_vals_interp.append(f_zxx_r(self.approx_array_list[i]))
+			self.zxx_i_vals_interp.append(f_zxx_i(self.approx_array_list[i]))
+			self.zyx_r_vals_interp.append(f_zyx_r(self.approx_array_list[i]))
+			self.zyx_i_vals_interp.append(f_zyx_i(self.approx_array_list[i]))
+			
+			self.zxy_r_vals_interp.append(f_zxy_r(self.approx_array_list[i]))
+			self.zxy_i_vals_interp.append(f_zxy_i(self.approx_array_list[i]))
+			self.zyy_r_vals_interp.append(f_zyy_r(self.approx_array_list[i]))
+			self.zyy_i_vals_interp.append(f_zyy_i(self.approx_array_list[i]))
+			self.index_periods_global.append(range(0,len(self.approx_array_list[i])))
+			self.period_vals_interp.append(self.approx_array_list[i])
+
+
+		self.zxx_r_vals = self.zxx_r_vals_interp
+		self.zxx_i_vals = self.zxx_i_vals_interp
+		self.zxy_r_vals = self.zxy_r_vals_interp
+		self.zxy_i_vals = self.zxy_i_vals_interp
+		self.zyx_r_vals = self.zyx_r_vals_interp
+		self.zyx_i_vals = self.zyx_i_vals_interp
+		self.zyy_r_vals = self.zyy_r_vals_interp
+		self.zyy_i_vals = self.zyy_i_vals_interp
+		self.period_vals = self.period_vals_interp
+
+
+
+	def adjust_data(self):
+
+		self.data_adjusted = []
+		print self.azimuth_list
+		for i in range(0,len(self.azimuth_list)):
+			for item in self.azimuth_list[i]:
+				if (item>90.0) and (item<=180.0):
+					item = item - 90.0
+					self.data_adjusted.append(item)
+				elif (item>180.0) and (item<=270.0):
+					item = item - 180.0
+					self.data_adjusted.append(item)
+				elif (item>270.0) and (item<=360):
+					item = item - 270.0
+					self.data_adjusted.append(item)
+				elif (item<0.0):
+					item = item + 90.0
+					self.data_adjusted.append(item)
+				else:
+					self.data_adjusted.append(item)
+
+		self.data_adjusted_4 = self.data_adjusted
+		
+		for i in range(0,len(self.data_adjusted)):
+			self.data_adjusted_4.append(self.data_adjusted[i] + 90.0)
+			self.data_adjusted_4.append(self.data_adjusted[i] + 180.0)
+			self.data_adjusted_4.append(self.data_adjusted[i] + 270.0)
+
+
+	def read_dat(self):
+
+		file_obj = open(self.data_path,'rb')
+		file_csv = csv.reader(file_obj,delimiter = ' ')
+		self.data = []
+		for row in file_csv:
+			self.data.append(float(row[0]))
+
+		self.data_adjusted = []
+		for item in self.data:
+			if (item>90.0) and (item<=180.0):
+				item = item - 90.0
+				self.data_adjusted.append(item)
+			elif (item>180.0) and (item<=270.0):
+				item = item - 180.0
+				self.data_adjusted.append(item)
+			elif (item>270.0) and (item<=360):
+				item = item - 270.0
+				self.data_adjusted.append(item)
+			else:
+				self.data_adjusted.append(item)
+
+		self.data_adjusted_4 = self.data_adjusted
+		
+		for i in range(0,len(self.data_adjusted)):
+			self.data_adjusted_4.append(self.data_adjusted[i] + 90.0)
+			self.data_adjusted_4.append(self.data_adjusted[i] + 180.0)
+			self.data_adjusted_4.append(self.data_adjusted[i] + 270.0)
+
+
+	def plot_rose(self):
+
+		
+
+		fig = plt.figure(figsize = (15,10))
+		ax = fig.add_axes([0.1,0.1,0.8,0.8], polar = True)
+		bin_plot = np.arange(0,365,5)
+		bin_plot = np.deg2rad(bin_plot)
+		self.data_adjusted_4 = np.deg2rad(np.asarray(self.data_adjusted_4))
+		bars, bins, patches = ax.hist(self.data_adjusted_4, bins = bin_plot,facecolor = 'k')
+		ax.set_theta_zero_location('N')
+		ax.set_theta_direction(-1)
+
+
+		print "Do you want to save the figure? y/n"
+		plot_input = raw_input()
+		if plot_input == "y":
+			plt.savefig('Strike_plot.png',dpi = 300)
+		else:
+			plt.show()
+
+	def beta_histogram(self):
+
+		amin = 0.0
+		amax = 0.0
+		two_dee = 0.0
+		five = 0.0
+		minusfive = 0.0
+		print self.beta_list
+		for k in range(0,len(self.beta_list)):
+			for i in self.beta_list[k]:
+				if i >= 3.0:
+					amax = amax + 1
+				elif i <=-3.0:
+					amin = amin + 1
+				else:
+					two_dee = two_dee + 1
+
+		total = amax + amin + two_dee
+
+		total_three_dee = ((amax + amin) / total)
+		total_min = ((amin) / total)
+		total_max = ((amax) / total)
+		total_two = ((two_dee) / total)
+
+
+		print '3D - - - ' + str(total_three_dee)
+		print '<-3 - - -' + str(total_min)
+		print '>3 - - - ' + str(total_max)
+		print '2D - - -' + str(total_two)
+
+		self.beta_list_flat = []
+		for sublist in self.beta_list:
+			for item in sublist:
+				self.beta_list_flat.append(item)
+
+		fig = plt.figure(figsize = (8,5))
+		plt.hist(self.beta_list_flat,bins = 500, color = '#2c2d28')
+		plt.xlabel(r'$\beta^{\circ}$')
+		plt.ylabel(r'$Count$')
+		plt.xlim((-10,10))
+		plt.hold(True)
+		plt.axvline(3,color = '#000000', linewidth = 2.5)
+		plt.axvline(-3,color = '#000000', linewidth = 2.5)
+		print 'Do you want to save the plot (1) or just show it (2)?'
+		plot_answer = raw_input()
+		if plot_answer == '1':
+			plt.savefig('Beta_hist.png',dpi = 300.0)
+		else:
+			plt.show()
+print 'Plot strike(1) or beta histogram(2)?'
+answer = raw_input()
+if answer == '1':
+
+	aaa = Plot_Rose()
+	aaa.read_edis()
+	aaa.select_freq()
+	aaa.calculate_phase_tensor_invariants()
+	aaa.adjust_data()
+	#aaa.read_dat()
+	aaa.plot_rose()
+elif answer == '2':
+	aaa = Plot_Rose()
+	aaa.read_edis()
+	aaa.select_freq()
+	aaa.calculate_phase_tensor_invariants()
+	aaa.beta_histogram()
+
+

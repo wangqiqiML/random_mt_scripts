@@ -1,0 +1,272 @@
+#!/usr/bin/env python
+
+import os,sys,csv,decimal,itertools
+import numpy as np
+
+class downweight_data(object):
+
+	def __init__(self):
+
+		print('What is the filename of the dat file?')
+		file_name_root = raw_input()
+		self.file_name = os.getcwd() + '/' + file_name_root + '.dat'
+
+		self.read_dat()
+		self.check_data()
+		self.write_dat()
+
+	def read_dat(self):
+
+		fileobj = open(self.file_name,'rb')
+		filecsv = csv.reader(fileobj,delimiter = ' ')
+		data = []
+		for row in filecsv:
+			data.append(row)
+		self.lendata = len(data)
+		for row in range(0,self.lendata):
+			data[row] = filter(None,data[row])
+
+		dash_found = False
+
+		for row in range(8,len(data)):
+			if data[row][0] == '#' :
+				limitlines = row-1
+				dash_found = True
+
+		if dash_found == False:
+			limitlines = len(data)
+
+		self.station_names = []
+		self.lon_degrees_list = []
+		self.lat_degrees_list = []
+		self.y = []
+		self.x = []
+		self.frequencies = []
+		station_change_row = []
+		self.mc_lat = float(data[6][1])
+		self.mc_lon = float(data[6][2])
+		self.total_freq_num = float(data[7][1])
+		for row in range(8,limitlines):
+			if data[row][1] != data[row-1][1] :
+				station_name = data[row][1]
+				self.station_names.append(station_name)
+				self.lat_degrees_list.append(float(data[row][2]))
+				self.lon_degrees_list.append(float(data[row][3]))
+				self.x.append(float(data[row][5]))
+				self.y.append(float(data[row][4]))
+				change = row
+				station_change_row.append(change)
+				self.lenst = len(station_change_row)
+		station_change_row.append(limitlines)
+
+
+		self.period_vals = []
+		self.freqlist = []
+		self.zxx_r_vals = []
+		self.zxx_i_vals = []
+		self.zxy_r_vals = []
+		self.zxy_i_vals = []
+		self.zyx_r_vals = []
+		self.zyx_i_vals = []
+		self.zyy_r_vals = []
+		self.zyy_i_vals = []
+
+		self.zxx_var_vals = []
+		self.zxy_var_vals = []
+		self.zyx_var_vals = []
+		self.zyy_var_vals = []
+
+		for i in range(0,self.lenst):
+			self.station_periodlist = []
+			self.station_freqlist = []
+			self.zxx_r_station_list = []
+			self.zxx_i_station_list = []
+			self.zxx_var_station_list = []
+			self.zxy_r_station_list = []
+			self.zxy_i_station_list = []
+			self.zxy_var_station_list = []
+			self.zyx_r_station_list = []
+			self.zyx_i_station_list = []
+			self.zyx_var_station_list = []
+			self.zyy_r_station_list = []
+			self.zyy_i_station_list = []
+			self.zyy_var_station_list = []
+
+			for row in range(station_change_row[i],station_change_row[i+1]):
+				if (row-8)%4 == 0:
+					period = float(data[row][0])
+					#print period
+					#print str(i) + '    iter no'
+					freq = 1.0 / (period)
+					self.station_periodlist.append(period)
+					self.station_freqlist.append(freq)
+				elif data[row][7] == 'ZYX':
+					zxx_r_station = float(data[row-2][8])
+					zxx_i_station = float(data[row-2][9])
+					zxx_var_station = float(data[row-2][10])
+					self.zxx_r_station_list.append(zxx_r_station)
+					self.zxx_i_station_list.append(zxx_i_station)
+					self.zxx_var_station_list.append(zxx_var_station)
+
+					zxy_r_station = float(data[row-1][8])
+					zxy_i_station = float(data[row-1][9])
+					zxy_var_station = float(data[row-1][10])
+					self.zxy_r_station_list.append(zxy_r_station)
+					self.zxy_i_station_list.append(zxy_i_station)
+					self.zxy_var_station_list.append(zxy_var_station)
+
+					zyx_r_station = float(data[row][8])
+					zyx_i_station = float(data[row][9])
+					zyx_var_station = float(data[row][10])
+					self.zyx_r_station_list.append(zyx_r_station)
+					self.zyx_i_station_list.append(zyx_i_station)
+					self.zyx_var_station_list.append(zyx_var_station)
+
+					zyy_r_station = float(data[row+1][8])
+					zyy_i_station = (float(data[row+1][9]))
+					zyy_var_station = float(data[row+1][10])
+					self.zyy_r_station_list.append(zyy_r_station)
+					self.zyy_i_station_list.append(zyy_i_station)
+					self.zyy_var_station_list.append(zyy_var_station)
+
+			self.zxx_r_vals.append(np.asarray(self.zxx_r_station_list))
+			self.zxx_i_vals.append(np.asarray(self.zxx_i_station_list))
+			self.zxx_var_vals.append(np.asarray(self.zxx_var_station_list))
+			self.zxy_r_vals.append(np.asarray(self.zxy_r_station_list))
+			self.zxy_i_vals.append(np.asarray(self.zxy_i_station_list))
+			self.zxy_var_vals.append(np.asarray(self.zxy_var_station_list))
+			self.zyx_r_vals.append(np.asarray(self.zyx_r_station_list))
+			self.zyx_i_vals.append(np.asarray(self.zyx_i_station_list))
+			self.zyx_var_vals.append(np.asarray(self.zyx_var_station_list))
+			self.zyy_r_vals.append(np.asarray(self.zyy_r_station_list))
+			self.zyy_i_vals.append(np.asarray(self.zyy_i_station_list))
+			self.zyy_var_vals.append(np.asarray(self.zyy_var_station_list))
+
+			self.period_vals.append(self.station_periodlist)
+
+			self.freqlist.append(1.0 / np.asarray(self.station_periodlist))
+			#print station_change_row[i],i
+
+		self.zxx_r_vals = np.asarray(self.zxx_r_vals)
+		self.zxx_i_vals = np.asarray(self.zxx_i_vals)
+		self.zxx_var_vals = np.asarray(self.zxx_var_vals)
+		self.zxy_r_vals = np.asarray(self.zxy_r_vals)
+		self.zxy_i_vals = np.asarray(self.zxy_i_vals)
+		self.zxy_var_vals = np.asarray(self.zxy_var_vals)
+		self.zyx_r_vals = np.asarray(self.zyx_r_vals)
+		self.zyx_i_vals = np.asarray(self.zyx_i_vals)
+		self.zyx_var_vals = np.asarray(self.zyx_var_vals)
+		self.zyy_r_vals = np.asarray(self.zyy_r_vals)
+		self.zyy_i_vals = np.asarray(self.zyy_i_vals)
+		self.zyy_var_vals = np.asarray(self.zyy_var_vals)
+		#self.period_vals = np.asarray(self.period_vals)
+		self.freqlist = np.asarray(self.freqlist)
+
+	def check_data(self):
+
+		def find_nearest(array,value):
+
+			#Function ot find nearest value from an array
+			idx = (np.abs(np.asarray(array)-value)).argmin()
+
+			return array[idx]
+
+		for i in range(0,len(self.zxy_r_vals)):
+
+			whichway_is_up = self.period_vals[i][1] - self.period_vals[i][0]
+			if whichway_is_up < 0:
+				search_direct = 0
+			else:
+				search_direct = 1
+			print('Checking the station :  ' + self.station_names[i])
+			print('####################')
+			print('Periods:')
+			print(self.period_vals[i])
+
+			while True:
+				print('Do you want to alter this station? y/n')
+				answer_station = raw_input()
+				if answer_station == 'y':
+					print('Enter the period to start to downweight.')
+					dw_start = float(input())
+					index_start = self.period_vals[i].index(find_nearest(self.period_vals[i],dw_start))
+					print('Enter the period to end. To select the last frequency type 000')
+					dw_end = raw_input()
+					if dw_end == '000':
+						if search_direct == 0:
+							index_end = 0
+						else:
+							index_end = len(self.zxy_r_vals[0])
+					else:
+						index_end = self.period_vals[i].index(find_nearest(self.period_vals[i],int(dw_end)))
+					print('What is the error rate for selected range and this station?')
+					answer_error = float(input())
+					if search_direct == 0:
+						a = index_end
+						b = index_start+1
+					else:
+						a = index_start
+						b = index_end+1
+					print(self.period_vals[i][a:b])
+					print('#############')
+					error = (answer_error/100.0) * ((self.zxy_r_vals[i][a:b]**2.0 + self.zxy_i_vals[i][a:b]**2.0) *\
+					(self.zyx_r_vals[i][a:b]**2.0 + self.zyx_i_vals[i][a:b]**2.0))**0.5
+					self.zxx_var_vals[i][a:b] = error
+					self.zxy_var_vals[i][a:b] = error
+					self.zyx_var_vals[i][a:b] = error
+					self.zyy_var_vals[i][a:b] = error
+					break
+
+				elif answer_station == 'n':
+
+					pass
+					break
+				else:
+					print('Enter a valid response y/n')
+
+	def write_dat(self):
+
+		dat_lines = []
+		dat_lines.append('# ModEM impedance responses for Created with MTMESH' +  '\n')
+		dat_lines.append('# Period(s) Code GG_Lat GG_Lon X(m) Y(m) Z(m) Component Real Imag Error\n')
+		dat_lines.append('> Full_Impedance\n')
+		dat_lines.append('> exp(+i\omega t)\n')
+		dat_lines.append('> [mV/km]/[nT]\n')
+		dat_lines.append('> 0.00\n')
+		dat_lines.append('> ' + str(self.mc_lat) + ' ' + str(self.mc_lon) + '\n' )
+		dat_lines.append('> ' + str(self.total_freq_num) + ' ' + str(len(self.period_vals)) + '\n')
+		for i in range(0,len(self.period_vals)):
+			for j in range(0,len(self.period_vals[i])):
+				for k in range(0,4):
+					if k == 0:
+						dum = 'ZXX'
+						dum2 = '% .5E' % decimal.Decimal(str(self.zxx_r_vals[i][j]))
+						dum3 = '% .5E' % decimal.Decimal(str(self.zxx_i_vals[i][j]))
+						dum4 = '% .5E' % decimal.Decimal(str(self.zxx_var_vals[i][j]))
+					elif k == 1:
+						dum = 'ZXY'
+						dum2 = '% .5E' % decimal.Decimal(str(self.zxy_r_vals[i][j]))
+						dum3 = '% .5E' % decimal.Decimal(str(self.zxy_i_vals[i][j]))
+						dum4 = '% .5E' % decimal.Decimal(str(self.zxy_var_vals[i][j]))
+					elif k == 2:
+						dum = 'ZYX'
+						dum2 = '% .5E' % decimal.Decimal(str(self.zyx_r_vals[i][j]))
+						dum3 = '% .5E' % decimal.Decimal(str(self.zyx_i_vals[i][j]))
+						dum4 = '% .5E' % decimal.Decimal(str(self.zyx_var_vals[i][j]))
+
+					elif k == 3:
+						dum = 'ZYY'
+						dum2 = '% .5E' % decimal.Decimal(str(self.zyy_r_vals[i][j]))
+						dum3 = '% .5E' % decimal.Decimal(str(self.zyy_i_vals[i][j]))
+						dum4 = '% .5E' % decimal.Decimal(str(self.zyy_var_vals[i][j]))
+					dat_lines.append(str('%.5E' % decimal.Decimal(self.period_vals[i][j])) + '  ' + '%-15s' % str(self.station_names[i]) + '  ' + str('% 7.4f' % self.lat_degrees_list[i]) +\
+						'  ' + str('% 7.4f' % self.lon_degrees_list[i]) + '  ' + str('% 12.3f' % (self.y[i])) + '  ' + str('% 12.3f' %(self.x[i])) + '  ' + str('%8.3f' % 0.0) + '  ' +\
+						 dum + '  ' + dum2 + '  ' + dum3 + '  ' + dum4 + '\n')
+
+		complete = self.file_name[:-4] + '_dw.dat'
+		filesave = file(complete,'w')
+		filesave.writelines(dat_lines)
+		filesave.close()
+
+
+aaa = downweight_data()

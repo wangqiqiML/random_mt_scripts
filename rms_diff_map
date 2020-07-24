@@ -1,0 +1,443 @@
+#!/usr/bin/env python
+
+import numpy as np
+import csv
+import os,sys
+import matplotlib.pyplot as plt
+from matplotlib.mlab import griddata
+from matplotlib import cm
+import matplotlib.colors as colorz
+#import scipy.interpolate as interp
+
+class MT_Res_plot(object):
+
+	def __init__(self):
+
+		self.dat_list = [os.path.join(os.getcwd(),dat) for dat in os.listdir(os.getcwd()) if dat.find('.dat')>0]
+		self.dat_list.sort()
+		print str(len(self.dat_list)) + ' number of dat files are found:'
+		for i in self.dat_list:
+			print i
+
+
+		self.edi_list = [os.path.join(os.getcwd(),edi) for edi in os.listdir(os.getcwd()) if edi.find('.edi')>0]
+		self.edi_list.sort()
+
+		print str(len(self.edi_list)) + ' number of edi files are found:'
+		for i in self.edi_list:
+			print i
+
+
+		self.mu = 4 * np.pi * 10**(-1)  #CGS
+		self.station_num = len(self.edi_list)
+
+		self.file_names = []
+		for i in range(0,len(self.edi_list)):
+			self.file_names.append(self.edi_list[i][self.edi_list[i].rfind('/')+1:-4])
+
+	def read_dats(self):
+
+		self.periodlist_model = []
+		self.freqlist_model = []
+		self.rhoxxlist_global_model = []
+		self.rhoxylist_global_model = []
+		self.rhoyxlist_global_model = []
+		self.rhoyylist_global_model = []
+		self.phasexxlist_global_model = []
+		self.phasexylist_global_model = []
+		self.phaseyxlist_global_model = []
+		self.phaseyylist_global_model = []
+		self.rhoxxerrlist_global_model = []
+		self.rhoxyerrlist_global_model = []
+		self.rhoyxerrlist_global_model = []
+		self.rhoyyerrlist_global_model = []
+		self.phasexxerrlist_global_model = []
+		self.phasexyerrlist_global_model = []
+		self.phaseyxerrlist_global_model = []
+		self.phaseyyerrlist_global_model = []
+
+		self.zxx_list_model = []
+		self.zxy_list_model = []
+		self.zyx_list_model = []
+		self.zyy_list_model = []
+
+		self.zxxerr_list_model = []
+		self.zxyerr_list_model = []
+		self.zyxerr_list_model = []
+		self.zyyerr_list_model = []
+
+		for dat_num in range(0,len(self.dat_list)):
+
+			fileobj = open(self.dat_list[dat_num],'rb')
+			filecsv = csv.reader(fileobj,delimiter = ' ')
+			data = []
+			for row in filecsv:
+				data.append(row)
+			self.lendata = len(data)
+			for row in range(0,self.lendata):
+				data[row] = filter(None,data[row])
+			dash_found = False
+			for row in range(8,self.lendata):
+				if data[row][0] == '#' :
+					limitlines = row-1
+
+			if dash_found == False:
+				limitlines = len(data)-1
+
+			self.station_names = []
+			self.frequencies = []
+			station_change_row = []
+			for row in range(8,limitlines):
+				if data[row][1] != data[row-1][1] :
+					station_name = data[row][1]
+					self.station_names.append(station_name)
+					change = row
+					station_change_row.append(change)
+					self.lenst = len(station_change_row)
+			station_change_row.append(limitlines)
+
+			self.periodlist = []
+			self.freqlist = []
+			self.zxx_list = []
+			self.zxy_list = []
+			self.zyx_list = []
+			self.zyy_list = []
+			self.zxxerr_list = []
+			self.zxyerr_list = []
+			self.zyxerr_list = []
+			self.zyyerr_list = []
+
+			for i in range(0,self.lenst):
+				self.station_periodlist = []
+				self.station_freqlist = []
+				self.station_zxxlist = []
+				self.station_zxylist = []
+				self.station_zyxlist = []
+				self.station_zyylist = []
+				self.station_zxxerrlist = []
+				self.station_zxyerrlist = []
+				self.station_zyxerrlist = []
+				self.station_zyyerrlist = []
+
+				for row in range(station_change_row[i],station_change_row[i+1]):
+					if (row-8)%4 == 0:
+						period = float(data[row][0])
+						#print period
+						#print str(i) + '    iter no'
+						freq = (2 * np.pi) / (period)
+						self.station_periodlist.append(period)
+						self.station_freqlist.append(freq)
+					elif data[row][7] == 'ZYX':
+						zxx_station = float(data[row-2][8]) + 1j*(float(data[row-2][9]))
+						zxxerr_station = float(data[row-2][10])
+						self.station_zxxlist.append(zxx_station)
+						self.station_zxxerrlist.append(zxxerr_station)
+						zxy_station = float(data[row-1][8]) + 1j*(float(data[row-1][9]))
+						zxyerr_station = float(data[row-1][10])
+						self.station_zxyerrlist.append(zxyerr_station)
+						self.station_zxylist.append(zxy_station)
+						zyx_station = float(data[row][8]) + 1j*(float(data[row][9]))
+						zyxerr_station = float(data[row][10])
+						self.station_zyxlist.append(zyx_station)
+						self.station_zyxerrlist.append(zyxerr_station)
+						zyy_station = float(data[row+1][8]) + 1j*(float(data[row+1][9]))
+						zyyerr_station = float(data[row+1][10])
+						self.station_zyylist.append(zyy_station)
+						self.station_zyyerrlist.append(zyyerr_station)
+				self.zxx_list.append(self.station_zxxlist)
+				self.zxy_list.append(self.station_zxylist)
+				self.zyx_list.append(self.station_zyxlist)
+				self.zyy_list.append(self.station_zyylist)
+				self.zxxerr_list.append(self.station_zxxerrlist)
+				self.zxyerr_list.append(self.station_zxyerrlist)
+				self.zyxerr_list.append(self.station_zyxerrlist)
+				self.zyyerr_list.append(self.station_zyyerrlist)
+
+				self.periodlist.append(self.station_periodlist)
+				self.freqlist.append(self.station_freqlist)
+				#print station_change_row[i],i
+
+			self.zxx_list_model.append(self.zxx_list)
+			self.zxy_list_model.append(self.zxy_list)
+			self.zyx_list_model.append(self.zyx_list)
+			self.zyy_list_model.append(self.zyy_list)
+			self.periodlist_model.append(self.periodlist)
+			self.zxxerr_list_model.append(self.zxxerr_list)
+			self.zxyerr_list_model.append(self.zxyerr_list)
+			self.zyxerr_list_model.append(self.zyxerr_list)
+			self.zyyerr_list_model.append(self.zyyerr_list)
+
+
+	def read_edi(self):
+
+		###----------EDI PART----------###
+		#Searching for edi files and appending them to a list.
+		if len(self.edi_list) == 0:
+			print('Warning : There are no edi files in the current direction.')
+			sys.exit()
+		self.edi_list.sort()
+
+		#Creating empty arrays for information.
+		self.station_lon_list = []
+		self.station_lat_list = []
+		self.lat_degrees_list = []
+		self.lon_degrees_list = []
+		self.station_name_list = []
+		self.station_num = len(self.edi_list)
+		edi_data = []
+		self.title_list = []
+		for i in range(0,self.station_num):
+			self.title_list.append('Station No : ' + str(i + 1))
+
+		#Reading in the edis for every station represented by "i" iterative number.
+
+		for i in range(0,self.station_num):
+
+			edi_obj = open(self.edi_list[i],'rb')
+			edi_csv = csv.reader(edi_obj,delimiter = ' ')
+			data_station = []
+			for row in edi_csv:
+				data_station.append(row)
+			edilendata = len(data_station)
+
+			for j in range(0,edilendata):
+				data_station[j] = filter(None,data_station[j])
+
+			data_station = filter(None,data_station)
+
+			edilendata = len(data_station)
+
+			for k in range(0,edilendata):
+				if data_station[k][0][:6] == 'REFLAT':
+					index_lat = k
+				elif data_station[k][0][:7] == 'REFLONG':
+					index_long = k
+					if len(data_station[k]) == 1:
+						index_help = 0
+					else:
+						index_help = 1
+
+						#Acquaring header information
+			self.station_lat_list.append(data_station[index_lat][0][7:])
+			if index_help == 0:
+				self.station_lon_list.append(data_station[index_long][0][8:])
+			else:
+				self.station_lon_list.append(data_station[index_long][1])
+
+		#Converting station locations to decimal points.
+
+			latitude_string_find = [pos for pos, char in enumerate(self.station_lat_list[i]) if char == ':']
+			longitude_string_find = [pos for pos, char in enumerate(self.station_lon_list[i]) if char == ':']
+
+			deg = float(self.station_lat_list[i][0:latitude_string_find[0]])
+			minute = float(self.station_lat_list[i][latitude_string_find[0]+1:latitude_string_find[1]]) / 60.0
+			second = float(self.station_lat_list[i][latitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lat = round(deg - minute - second,5)
+			else:
+				lat = round(deg + minute + second,5)
+			self.lat_degrees_list.append(lat)
+			deg = float(self.station_lon_list[i][0:longitude_string_find[0]])
+			minute = float(self.station_lon_list[i][longitude_string_find[0]+1:longitude_string_find[1]]) / 60.0
+			second = float(self.station_lon_list[i][longitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lon = round(deg - minute - second,5)
+			else:
+				lon = round(deg + minute + second,5)
+			self.lon_degrees_list.append(lon)
+
+
+
+	def calculate_RMS(self):
+
+		self.num_freq_list = [len(self.periodlist_model[0][k]) for k in range(0,len(self.periodlist_model[0]))]
+
+		self.z_matrix_list_model = []
+		self.d_matrix_list_model = []
+		self.rms_list = []
+
+		for i in range(0,self.station_num):
+			d_matrix_list = []
+			z_matrix_list = []
+			for j in range(0,self.num_freq_list[i]):
+				d_matrix = np.matrix([[self.zxx_list_model[0][i][j],self.zxy_list_model[0][i][j]],[self.zyx_list_model[0][i][j],self.zyy_list_model[0][i][j]]])
+				d_matrix_list.append(d_matrix)
+				z_matrix = np.matrix([[self.zxx_list_model[1][i][j],self.zxy_list_model[1][i][j]],[self.zyx_list_model[1][i][j],self.zyy_list_model[1][i][j]]])
+				z_matrix_list.append(z_matrix)
+			self.z_matrix_list_model.append(z_matrix_list)
+			self.d_matrix_list_model.append(d_matrix_list)
+		self.z_matrix_list_model = np.asarray(self.z_matrix_list_model)
+		self.d_matrix_list_model = np.asarray(self.d_matrix_list_model)
+
+		for i in range(0,self.station_num):
+			rms = 0
+			misfit = 0
+			for j in range(0,self.num_freq_list[i]):
+				"""
+				rms = rms + ((np.trace(np.transpose(np.conjugate(self.z_matrix_list_model[i][j]-self.d_matrix_list_model[i][j])) *\
+				(self.z_matrix_list_model[i][j]-self.d_matrix_list_model[i][j]))) / (np.trace(np.transpose(np.conjugate(self.d_matrix_list_model[i][j])) *\
+				self.d_matrix_list_model[i][j])))
+				"""
+				misfit = 0.5 * (np.trace(np.transpose(np.conjugate(self.z_matrix_list_model[i][j]-self.d_matrix_list_model[i][j])) *\
+				(self.z_matrix_list_model[i][j]-self.d_matrix_list_model[i][j])))
+
+
+			rms_stat = (np.sqrt((1.0/self.num_freq_list[i]) * rms))
+
+			self.rms_list.append(rms)
+		rms_tot = np.sum(self.rms_list)
+		rms_tot = np.sqrt(rms_tot / (25.0*15.0))
+
+	def calculate_RMS_2(self):
+
+		self.num_freq_list = [len(self.periodlist_model[0][k]) for k in range(0,len(self.periodlist_model[0]))]
+		"""
+		self.max_lis_xy = np.amax(np.abs(np.asarray(self.zxy_list_model[0])))
+		self.min_lis_xy = np.amin(np.abs(np.asarray(self.zxy_list_model[0])))
+		self.max_lis_yx = np.amax(np.abs(np.asarray(self.zyx_list_model[0])))
+		self.min_lis_yx = np.amin(np.abs(np.asarray(self.zyx_list_model[0])))
+		self.max_lis_xx = np.amax(np.abs(np.asarray(self.zxx_list_model[0])))
+		self.min_lis_xx = np.amin(np.abs(np.asarray(self.zxx_list_model[0])))
+		self.max_lis_yy = np.amax(np.abs(np.asarray(self.zyy_list_model[0])))
+		self.min_lis_yy = np.amin(np.abs(np.asarray(self.zyy_list_model[0])))
+		"""
+
+		self.zxy_list_model = np.asarray(self.zxy_list_model)
+		self.zyx_list_model = np.asarray(self.zyx_list_model)
+		self.zxx_list_model = np.asarray(self.zxx_list_model)
+		self.zyy_list_model = np.asarray(self.zyy_list_model)
+		self.zxyerr_list_model = np.asarray(self.zxyerr_list_model)
+		self.zyxerr_list_model = np.asarray(self.zyxerr_list_model)
+		self.zxxerr_list_model = np.asarray(self.zxxerr_list_model)
+		self.zyyerr_list_model = np.asarray(self.zyyerr_list_model)
+
+		self.zxy_misfit_list = []
+		self.zyx_misfit_list = []
+		self.zxx_misfit_list = []
+		self.zyy_misfit_list = []
+		self.rms_xy_list = []
+		self.rms_yx_list = []
+		self.rms_xx_list = []
+		self.rms_yy_list = []
+
+		self.rms_xy_list_2 = []
+		self.rms_yx_list_2 = []
+		self.rms_xx_list_2 = []
+		self.rms_yy_list_2 = []
+		self.zxy_misfit_list_2 = []
+		self.zyx_misfit_list_2 = []
+		self.zxx_misfit_list_2 = []
+		self.zyy_misfit_list_2 = []
+
+
+
+		for i in range(0,self.station_num):
+			for j in range(0,self.num_freq_list[i]):
+				zxy_misfit = (np.asarray(self.zxy_list_model[1][i]) - np.asarray(self.zxy_list_model[0][i])) / np.asarray(self.zxyerr_list_model[0][i])
+				zyx_misfit = (np.asarray(self.zyx_list_model[1][i]) - np.asarray(self.zyx_list_model[0][i])) / np.asarray(self.zyxerr_list_model[0][i])
+				zxx_misfit = (np.asarray(self.zxx_list_model[1][i]) - np.asarray(self.zxx_list_model[0][i])) / np.asarray(self.zxxerr_list_model[0][i])
+				zyy_misfit = (np.asarray(self.zyy_list_model[1][i]) - np.asarray(self.zyy_list_model[0][i])) / np.asarray(self.zyyerr_list_model[0][i])
+				zxy_misfit_2 = (np.asarray(self.zxy_list_model[2][i]) - np.asarray(self.zxy_list_model[0][i])) / np.asarray(self.zxyerr_list_model[0][i])
+				zyx_misfit_2 = (np.asarray(self.zyx_list_model[2][i]) - np.asarray(self.zyx_list_model[0][i])) / np.asarray(self.zyxerr_list_model[0][i])
+				zxx_misfit_2 = (np.asarray(self.zxx_list_model[2][i]) - np.asarray(self.zxx_list_model[0][i])) / np.asarray(self.zxxerr_list_model[0][i])
+				zyy_misfit_2 = (np.asarray(self.zyy_list_model[2][i]) - np.asarray(self.zyy_list_model[0][i])) / np.asarray(self.zyyerr_list_model[0][i])
+			rmsxy = zxy_misfit.std()
+			rmsyx = zyx_misfit.std()
+			rmsxx = zxx_misfit.std()
+			rmsyy = zyy_misfit.std()
+			rmsxy_2 = zxy_misfit_2.std()
+			rmsyx_2 = zyx_misfit_2.std()
+			rmsxx_2 = zxx_misfit_2.std()
+			rmsyy_2 = zyy_misfit_2.std()
+
+			self.zxy_misfit_list.append(zxy_misfit)
+			self.zyx_misfit_list.append(zyx_misfit)
+			self.zxx_misfit_list.append(zxx_misfit)
+			self.zyy_misfit_list.append(zyy_misfit)
+			self.rms_xy_list.append(rmsxy)
+			self.rms_yx_list.append(rmsyx)
+			self.rms_xx_list.append(rmsxx)
+			self.rms_yy_list.append(rmsyy)
+
+			self.rms_xy_list_2.append(rmsxy_2)
+			self.rms_yx_list_2.append(rmsyx_2)
+			self.rms_xx_list_2.append(rmsxx_2)
+			self.rms_yy_list_2.append(rmsyy_2)
+
+			self.rms_diff_xy = np.asarray(self.rms_xy_list_2) - np.asarray(self.rms_xy_list)
+			self.rms_diff_yx = np.asarray(self.rms_yx_list_2) - np.asarray(self.rms_yx_list)
+			self.rms_diff_xx = np.asarray(self.rms_xx_list_2) - np.asarray(self.rms_xx_list)
+			self.rms_diff_yy = np.asarray(self.rms_yy_list_2) - np.asarray(self.rms_yy_list)
+
+
+	def plot_maps(self):
+
+		cblimit = 2.0
+		self.x_min = min(self.lon_degrees_list)
+		self.x_max = max(self.lon_degrees_list)
+		self.y_min = min(self.lat_degrees_list)
+		self.y_max = max(self.lat_degrees_list)
+		"""
+		self.x_new = np.linspace(self.x_min - 0.25, self.x_max + 0.25, 300)
+		self.y_new = np.linspace(self.y_min - 0.25, self.y_max + 0.25, 300)
+		XI,YI = np.meshgrid(self.x_new,self.y_new)
+
+		self.xy_misfit_list = np.asarray(self.zxy_misfit_list)
+		self.yx_misfit_list = np.asarray(self.zyx_misfit_list)
+		self.xx_misfit_list = np.asarray(self.zxx_misfit_list)
+		self.yy_misfit_list = np.asarray(self.zyy_misfit_list)
+
+		DATA_XY = interp.griddata((self.lon_degrees_list,self.lat_degrees_list), self.rms_xy_list, (XI,YI),method = 'linear')
+		"""
+		fig = plt.figure(figsize = (15,10))
+		ax1 = plt.subplot2grid((16,17),(0,0), rowspan = 7,colspan = 8)
+		ax2 = plt.subplot2grid((16,17),(9,0), rowspan = 7,colspan = 8)
+		ax3 = plt.subplot2grid((16,17),(0,9), rowspan = 7,colspan = 8)
+		ax4 = plt.subplot2grid((16,17),(9,9), rowspan = 7,colspan = 8)
+
+
+		cax_xx = ax1.scatter(self.lon_degrees_list,self.lat_degrees_list, c = self.rms_diff_xx, cmap = 'seismic', marker = 's',
+		 linewidth = 0.5, edgecolor = 'k')
+		cax_xx.set_clim(-cblimit,cblimit)
+		ax1.set_xlim(self.x_min - 0.25,self.x_max + 0.25)
+		cbar_xx = fig.colorbar(cax_xx,boundaries=np.linspace(-cblimit,cblimit),orientation="vertical", pad=0.05,
+		 ticks = [-cblimit,0.0,cblimit], ax = ax1)
+		cax_xy = ax2.scatter(self.lon_degrees_list,self.lat_degrees_list, c = self.rms_diff_xy, cmap = 'seismic', marker = 's',
+		 linewidth = 0.5, edgecolor = 'k')
+		ax2.set_xlim(self.x_min - 0.25,self.x_max + 0.25)
+		cax_xy.set_clim(-cblimit,cblimit)
+		cbar_xy = fig.colorbar(cax_xy,boundaries=np.linspace(-cblimit,cblimit),orientation="vertical", pad=0.05,
+		 ticks = [-cblimit,0,cblimit], ax = ax2)
+
+		cax_yx = ax3.scatter(self.lon_degrees_list,self.lat_degrees_list, c = self.rms_diff_yx, cmap = 'seismic', marker = 's',
+		 linewidth = 0.5, edgecolor = 'k')
+		ax3.set_xlim(self.x_min - 0.25,self.x_max + 0.25)
+		cax_yx.set_clim(-cblimit,cblimit)
+		cbar_yx = fig.colorbar(cax_yx,boundaries=np.linspace(-cblimit,cblimit),orientation="vertical", pad=0.05,
+		 ticks = [-cblimit,0,cblimit], ax = ax3)
+		cax_yy = ax4.scatter(self.lon_degrees_list,self.lat_degrees_list, c = self.rms_diff_yy, cmap = 'seismic', marker = 's',
+		 linewidth = 0.5, edgecolor = 'k')
+		ax4.set_xlim(self.x_min - 0.25,self.x_max + 0.25)
+		cax_yy.set_clim(-cblimit,cblimit)
+		cbar_yy = fig.colorbar(cax_yy,boundaries=np.linspace(-cblimit,cblimit),orientation="vertical", pad=0.05,
+		 ticks = [-cblimit,0,cblimit], ax = ax4)
+		cbar_xy.set_label('RMS difference')
+		cbar_yx.set_label('RMS difference')
+		cbar_xx.set_label('RMS difference')
+		cbar_yy.set_label('RMS difference')
+		ax1.set_title('XX')
+		ax2.set_title('XY')
+		ax3.set_title('YX')
+		ax4.set_title('YY')
+		#plt.show()
+		plt.savefig('RMS_MAP.png',dpi = 300)
+
+
+####SCRIPT####
+aaa = MT_Res_plot()
+aaa.read_dats()
+aaa.read_edi()
+#aaa.calculate_RMS()
+aaa.calculate_RMS_2()
+aaa.plot_maps()
+####END OF CODE####

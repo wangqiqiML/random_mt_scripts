@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+
+import os,sys
+import numpy as np
+import csv
+
+
+
+class rho2ws(object):
+
+	def __init__(self):
+
+		print 'What is the rho filename?'
+		rho_name = raw_input()
+		self.rho_path = os.getcwd() + '/' + rho_name + '.rho'
+		self.file_name = self.rho_path[self.rho_path.rfind('/')+1:-4]
+
+	def convert(self):
+
+
+		rho_obj = open(self.rho_path,'rb')
+		rho_csv = csv.reader(rho_obj, delimiter = ' ')
+		rho_data = []
+		for row in rho_csv:
+		    rho_data.append(row)
+		lenrho = len(rho_data)
+		for row in range(0,lenrho):
+		    rho_data[row] = filter(None,rho_data[row])
+		self.rho_data = filter(None,rho_data)
+		lenrho = len(self.rho_data)
+		self.x_num = self.rho_data[1][0]
+		self.y_num = self.rho_data[1][1]
+		self.z_num = self.rho_data[1][2]
+		self.type = self.rho_data[1][3]
+
+		self.x_grid = self.rho_data[2]
+		self.y_grid = self.rho_data[3]
+		self.z_grid = self.rho_data[4]
+
+		self.lenxgrid = len(self.x_grid)
+		self.lenygrid = len(self.y_grid)
+		self.lenzgrid = len(self.z_grid)
+
+		lencol = len(self.rho_data[5])
+		self.resistivity = []
+		for row in range(5,lenrho-2):
+		    for col in range(0,lencol):
+		        dummyresistivity = '  ' + str(np.exp(float(self.rho_data[row][col]))) + '\n'
+		        self.resistivity.append(dummyresistivity)
+
+		model_writer_list = []
+		header = ''.join(['#Iteration No.   99  RMS =          ','\n'])
+		model_writer_list.append(header)
+		header2 = ''.join(['  ',self.x_num,'  ',self.y_num,'  ',self.z_num,'   ',self.type,'\n'])
+		model_writer_list.append(header2)
+
+		self.x_num = int(self.x_num)
+		self.y_num = int(self.y_num)
+		self.z_num = int(self.z_num)
+
+		moduloxgrid = self.lenxgrid%7
+		moduloygrid = self.lenygrid%7
+		modulozgrid = self.lenzgrid%7
+
+		xgridwriterlastlist = ['  ']
+		ygridwriterlastlist = ['  ']
+		zgridwriterlastlist = ['  ']
+
+		for i in range(0,self.lenxgrid,7):
+		    if (i < (self.lenxgrid - moduloxgrid)):
+		        xgridwriter = ''.join(['  ',self.x_grid[i],'  ',self.x_grid[i+1],'  ',self.x_grid[i+2],'  ',self.x_grid[i+3],
+		            '  ',self.x_grid[i+4],'  ',self.x_grid[i+5],'  ',self.x_grid[i+6], '\n'])
+		        model_writer_list.append(xgridwriter)
+		    elif (i == self.lenxgrid - moduloxgrid):
+		        for j in range(i,i+moduloxgrid):
+		            xgridwriterlast = self.x_grid[j] + '  '
+		            xgridwriterlastlist.append(xgridwriterlast)
+		        xgridwriterlastlist.append('\n')
+		        xgridwriter = ''.join(xgridwriterlastlist)
+		        model_writer_list.append(xgridwriter)
+
+		for i in range(0,self.lenygrid,7):
+		    if (i < (self.lenygrid - moduloygrid)):
+		        ygridwriter = ''.join(['  ',self.y_grid[i],'  ',self.y_grid[i+1],'  ',self.y_grid[i+2],'  ',self.y_grid[i+3],
+		            '  ',self.y_grid[i+4],'  ',self.y_grid[i+5],'  ',self.y_grid[i+6],'\n'])
+		        model_writer_list.append(ygridwriter)
+		    elif (i == self.lenygrid - moduloygrid):
+		        for j in range(i,i+moduloygrid):
+		            ygridwriterlast = self.y_grid[j] + '  '
+		            ygridwriterlastlist.append(ygridwriterlast)
+		        ygridwriterlastlist.append('\n')
+		        ygridwriter = ''.join(ygridwriterlastlist)
+		        model_writer_list.append(ygridwriter)
+
+		for i in range(0,self.lenzgrid,7):
+		    if (i < (self.lenzgrid - modulozgrid)):
+		        zgridwriter = ''.join(['  ',self.z_grid[i],'  ',self.z_grid[i+1],'  ',self.z_grid[i+2],'  ',self.z_grid[i+3],
+		            '  ',self.z_grid[i+4],'  ',self.z_grid[i+5],'  ',self.z_grid[i+6],'\n'])
+		        model_writer_list.append(zgridwriter)
+		    elif (i == self.lenzgrid - modulozgrid):
+		        for j in range(i,i+modulozgrid):
+		            zgridwriterlast = self.z_grid[j] + '  '
+		            zgridwriterlastlist.append(zgridwriterlast)
+		        zgridwriterlastlist.append('\n')
+		        zgridwriter = ''.join(zgridwriterlastlist)
+		        model_writer_list.append(zgridwriter)
+
+		lenres = len(self.resistivity)
+
+		for i in range(0,lenres):
+		    model_writer_list.append(self.resistivity[i])
+
+		filesave = file(self.file_name + '_model.'+ '99','w')
+		filesave.writelines(model_writer_list)
+		filesave.close()
+		print 'Files are written in ' + os.getcwd()
+
+
+aaa = rho2ws()
+aaa.convert()

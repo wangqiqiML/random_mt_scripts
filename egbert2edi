@@ -1,0 +1,616 @@
+#!/usr/bin/env python
+
+import numpy as np
+import csv
+import os,sys
+import decimal
+import math
+import datetime
+
+class egbert2edi(object):
+
+	def __init__(self):
+
+		print ('This programs converts the transfer function files produced by egbert s processing code into impedance format edis')
+		print ('What is the file format for your files ? 1. zmm, 2. zss, 3. zrr ?')
+		self.answer_input = raw_input()
+		if self.answer_input == '1':
+			self.file_list = [os.path.join(os.getcwd(),z) for z in os.listdir(os.getcwd()) if z.find('.zmm')>0]
+		elif self.answer_input == '2':
+			self.file_list = [os.path.join(os.getcwd(),z) for z in os.listdir(os.getcwd()) if z.find('.zss')>0]
+		elif self.answer_input == '3':
+			self.file_list = [os.path.join(os.getcwd(),z) for z in os.listdir(os.getcwd()) if z.find('.zrr')>0]
+		else:
+			print 'Please input a valid option. exiting program ...'
+			sys.exit()
+
+		for i in self.file_list:
+			print i
+
+		print(str(len(self.file_list)) + ' stations are found.')
+		print('Do you want to continue ? y/n')
+		prim_answer = raw_input()
+		if prim_answer == 'y':
+			pass
+		else:
+			print("Bye.")
+			sys.exit()
+
+	def read_files(self):
+
+		if len(self.file_list) == 0:
+			print('Warning : There are no edi files in the current direction.')
+			sys.exit()
+		self.file_list.sort()
+
+		self.station_num = len(self.file_list)
+
+		self.station_name_list = []
+		self.lon_list = []
+		self.lat_list = []
+
+		self.period_list_global = []
+		self.freq_list_global = []
+		self.zxx_r_list_global = []
+		self.zxx_i_list_global = []
+		self.zxy_r_list_global = []
+		self.zxy_i_list_global = []
+		self.zyx_r_list_global = []
+		self.zyx_i_list_global = []
+		self.zyy_r_list_global = []
+		self.zyy_i_list_global = []
+		self.tx_r_list_global = []
+		self.tx_i_list_global = []
+		self.ty_r_list_global = []
+		self.ty_i_list_global = []
+		self.zxx_var_list_global = []
+		self.zxy_var_list_global = []
+		self.zyx_var_list_global = []
+		self.zyy_var_list_global = []
+		self.tx_var_list_global = []
+		self.ty_var_list_global = []
+
+		for i in range(0,self.station_num):
+
+			#reading all files one by one
+			file_obj = open(self.file_list[i],'rb')
+			file_csv = csv.reader(file_obj, delimiter = ' ')
+			data_station = []
+
+			for row in file_csv:
+				data_station.append(row)
+
+			filelendata = len(data_station)
+
+			#Filtering the file for empty arrays
+			for j in range(0,filelendata):
+				data_station[j] = filter(None,data_station[j])
+
+			data_station = filter(None,data_station)
+
+			filelendata = len(data_station)
+
+			if self.answer_input == '1':
+				self.station_name_list.append(data_station[2][0])
+				self.lat_list.append(float(data_station[3][1]))
+				self.lon_list.append(float(data_station[3][2]))
+			elif self.answer_input == '2' or '3':
+				self.station_name_list.append(data_station[3][1][1:])
+				self.lat_list.append(float(data_station[4][1]))
+				self.lon_list.append(float(data_station[4][2]))
+
+
+			print 'Reading in station : ' + str(self.station_name_list[i])
+
+			#searching for the data positions via period blocks
+
+			index_period_list = []
+			period_list = []
+			freq_list = []
+			sampling_list = []
+			zxx_r_list = []
+			zxx_i_list = []
+			zxy_r_list = []
+			zxy_i_list = []
+			zyx_r_list = []
+			zyx_i_list = []
+			zyy_r_list = []
+			zyy_i_list = []
+			tx_r_list = []
+			tx_i_list = []
+			ty_r_list = []
+			ty_i_list = []
+			tx_var_list = []
+			ty_var_list = []
+			n11_list = []
+			n22_list = []
+			n33_list = []
+			n21_list = []
+			n31_list = []
+			n32_list = []
+			sxx_list = []
+			sxy_list = []
+			syy_list = []
+			syx_list = []
+			zxx_var_list = []
+			zxy_var_list = []
+			zyx_var_list = []
+			zyy_var_list = []
+
+			for k in range(0,filelendata):
+
+				if data_station[k][0] == 'period':
+					index_period_list.append(k)
+					period_list.append(data_station[k][2])
+					freq_list.append(str(1.0/float(data_station[k][2])))
+					sampling_list.append(data_station[k+1][4])
+					zxx_r_list.append(data_station[k+4][0])
+					zxx_i_list.append(data_station[k+4][1])
+					zxy_r_list.append(data_station[k+4][2])
+					zxy_i_list.append(data_station[k+4][3])
+					zyx_r_list.append(data_station[k+5][0])
+					zyx_i_list.append(data_station[k+5][1])
+					zyy_r_list.append(data_station[k+5][2])
+					zyy_i_list.append(data_station[k+5][3])
+					tx_r_list.append(data_station[k+3][0])
+					tx_i_list.append(data_station[k+3][1])
+					ty_r_list.append(data_station[k+3][2])
+					ty_i_list.append(data_station[k+3][3])
+					n11_list.append(float(data_station[k+10][0]))
+					n21_list.append((float(data_station[k+11][0]) + float(data_station[k+11][1])*1j))
+					n22_list.append(float(data_station[k+11][2]))
+					n31_list.append((float(data_station[k+12][0]) + float(data_station[k+12][1])*1j))
+					n32_list.append((float(data_station[k+12][2]) + float(data_station[k+12][3])*1j))
+					n33_list.append(float(data_station[k+12][4]))
+					sxx_list.append(float(data_station[k+7][0]))
+					syy_list.append(float(data_station[k+8][2]))
+					sxy_list.append((float(data_station[k+8][0]) - float(data_station[k+8][1])*1j))
+					syx_list.append((float(data_station[k+8][0]) + float(data_station[k+8][1])*1j))
+					zxx_var_list.append(float(data_station[k+7][0]) * (float(data_station[k+11][2])/2.0))
+					zyy_var_list.append(float(data_station[k+8][2]) * (float(data_station[k+12][4])/2.0))
+					zxy_var_list.append(float(data_station[k+8][2]) * (float(data_station[k+11][2])/2.0))
+					zyx_var_list.append(float(data_station[k+7][0]) * (float(data_station[k+12][4])/2.0))
+					tx_var_list.append(float(data_station[k+7][0]) * (float(data_station[k+10][0])/2.0))
+					ty_var_list.append(float(data_station[k+8][2]) * (float(data_station[k+11][2])/2.0))
+
+
+			self.period_list_global.append(period_list)
+			self.freq_list_global.append(freq_list)
+			self.zxx_r_list_global.append(zxx_r_list)
+			self.zxx_i_list_global.append(zxx_i_list)
+			self.zxy_r_list_global.append(zxy_r_list)
+			self.zxy_i_list_global.append(zxy_i_list)
+			self.zyx_r_list_global.append(zyx_r_list)
+			self.zyx_i_list_global.append(zyx_i_list)
+			self.zyy_r_list_global.append(zyy_r_list)
+			self.zyy_i_list_global.append(zyy_i_list)
+			self.tx_r_list_global.append(tx_r_list)
+			self.tx_i_list_global.append(tx_i_list)
+			self.ty_r_list_global.append(ty_r_list)
+			self.ty_i_list_global.append(ty_i_list)
+			self.tx_var_list_global.append(tx_var_list)
+			self.ty_var_list_global.append(ty_var_list)
+			self.zxx_var_list_global.append(zxx_var_list)
+			self.zxy_var_list_global.append(zxy_var_list)
+			self.zyx_var_list_global.append(zyx_var_list)
+			self.zyy_var_list_global.append(zyy_var_list)
+
+		self.latitude_corr_list = []
+		self.longitude_corr_list = []
+		#CONVERTING TO DEGREES SECONDS
+		for element in self.lat_list:
+			deg = str(int(element))
+			minute = (float(element) - int(element)) * 60.0
+			second = (float(element) - int(element) - (minute/60.0)) * 3600
+			self.latitude_corr_list.append(str(deg) + ':' + str(minute) + ':' + str(second))
+		for element in self.lon_list:
+			deg = str(int(element))
+			minute = (float(element) - int(element)) * 60.0
+			second = (float(element) - int(element) - (minute/60.0)) * 3600
+			self.longitude_corr_list.append(str(deg) + ':' + str(minute) + ':' + str(second))
+
+
+
+	def write_edi_file(self):
+
+		now = datetime.datetime.now()
+		for i in range(0,len(self.file_list)):
+
+			edi_lines = ['>HEAD\n','DATAID="'+ str(self.station_name_list[i]) + '"\n','ACQBY=""\n','FILEBY=""\n','ACQDATE=""\n','FILEDATE=' + str(now.day) +\
+			'/' + str(now.month) + '/' + str(now.year) + '\n','PROSPECT=\n','LOC=\n', '>=DEFINEMEAS\n', '\n', 'REFLAT=' + self.latitude_corr_list[i] + '\n','REFLONG=' + self.longitude_corr_list[i] +\
+			 '\n', 'REFELEV=0.0\n','\n','>=MTSECT\n','NFREQ=' +  str(len(self.period_list_global[i])) + '\n','\n']
+
+
+			edi_lines.append('>FREQ //' + str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.freq_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.freq_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.freq_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+
+			edi_lines.append('>ZROT //' + str(len(self.period_list_global[i]))+'\n')
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXXR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXXI ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXX.VAR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxx_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXYR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXYI ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZXY.VAR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zxy_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYXR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYXI ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYX.VAR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyx_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYYR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYYI ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>ZYY.VAR ROT=ZROT //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.zyy_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>RHOROT //'+ str(len(self.period_list_global[i]))+'\n')
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+
+			edi_lines.append('>TROT.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(0.0)))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>TXR.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>TXI.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>TXVAR.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.tx_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+
+			edi_lines.append('>TYR.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_r_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_r_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_r_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>TYI.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_i_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_i_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_i_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+
+			edi_lines.append('>TYVAR.EXP //'+ str(len(self.period_list_global[i]))+'\n')
+
+			dums = []
+			for k in range(0,len(self.period_list_global[i])):
+
+				if (k+1)%6 == 0 and k!= 0:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_var_list_global[i][k])))
+					dums.append('  \n')
+				elif k == len(self.period_list_global[i])-1:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_var_list_global[i][k])))
+					dums.append('  \n')
+				else:
+					dums.append(str('% .5E' % decimal.Decimal(self.ty_var_list_global[i][k])))
+					dums.append('  ')
+			dumlines = ''.join(dums)
+			edi_lines.append(dumlines)
+			edi_lines.append('\n')
+			edi_lines.append('>END')
+
+			complete_param = os.getcwd() + '/'+  str(self.station_name_list[i]) + '_rev.edi'
+			print('File saved as ' + str(self.station_name_list[i]) + '_rev.edi at : ' + os.getcwd())
+			print('Goodbye')
+			filesave = file(complete_param,'w')
+			filesave.writelines(edi_lines)
+			filesave.close
+
+		print('Please note that this program does not compute any additional parameters such as, TIPMAG, ELLIP...')
+
+
+
+####SCRIPT####
+aaa = egbert2edi()
+aaa.read_files()
+aaa.write_edi_file()
+####END OF CODE####

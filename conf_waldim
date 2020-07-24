@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+
+import csv
+import os,sys
+
+class conf_waldim(object):
+
+	def __init__(self):
+
+		self.edi_path = os.getcwd()
+		self.edi_list= [os.path.join(self.edi_path,edi) for edi in os.listdir(self.edi_path) if edi.find('.edi')>0]
+		self.edi_list.sort()
+
+		self.num_sites = len(self.edi_list)
+
+		self.station_name_list = []
+		for i in range(0,len(self.edi_list)):
+			self.station_name_list.append(self.edi_list[i][self.edi_list[i].rfind('/')+1:-4])
+
+	def read_edi(self):
+
+		self.station_lon_list = []
+		self.station_lat_list = []
+		self.lat_degrees_list = []
+		self.lon_degrees_list = []
+		edi_data = []
+		for i in range(0,self.num_sites):
+			edi_obj = open(self.edi_list[i],'rb')
+			edi_csv = csv.reader(edi_obj,delimiter = ' ')
+			data_station = []
+			for row in edi_csv:
+				data_station.append(row)
+			for row in range(0,len(data_station)):
+				data_station[row] = filter(None,data_station[row])
+			data_station = filter(None,data_station)
+			edilendata = len(data_station)
+
+			self.edi_type = 0
+
+			for k in range(0,edilendata):
+				if data_station[k][0] == '>!****FREQUENCIES****!':
+					self.edi_type =+ 1
+				elif data_station[k][0][:6] == 'REFLAT':
+					index_lat = k
+				elif data_station[k][0][:7] == 'REFLONG':
+					index_long = k
+					if len(data_station[k]) == 1:
+						index_help = 0
+					else:
+						index_help = 1
+
+
+			#Acquaring header information
+			self.station_lat_list.append(data_station[index_lat][0][7:])
+			if index_help == 0:
+				self.station_lon_list.append(data_station[index_long][0][8:])
+			else:
+				self.station_lon_list.append(data_station[index_long][1])
+
+
+			latitude_string_find = [pos for pos, char in enumerate(self.station_lat_list[i]) if char == ':']
+			longitude_string_find = [pos for pos, char in enumerate(self.station_lon_list[i]) if char == ':']
+
+			deg = float(self.station_lat_list[i][0:latitude_string_find[0]])
+			minute = float(self.station_lat_list[i][latitude_string_find[0]+1:latitude_string_find[1]]) / 60.0
+			second = float(self.station_lat_list[i][latitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lat = round(deg - minute - second,5)
+			else:
+				lat = round(deg + minute + second,5)
+			self.lat_degrees_list.append(lat)
+			deg = float(self.station_lon_list[i][0:longitude_string_find[0]])
+			minute = float(self.station_lon_list[i][longitude_string_find[0]+1:longitude_string_find[1]]) / 60.0
+			second = float(self.station_lon_list[i][longitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lon = round(deg - minute - second,5)
+			else:
+				lon = round(deg + minute + second,5)
+			self.lon_degrees_list.append(lon)
+			print('Reading in the edi :' +  str(self.station_name_list[i]))
+
+		print('There are ' + str(self.num_sites) + ' have been read. Do you want to continue ? y/n')
+		answer = raw_input()
+		if answer == 'y':
+			pass
+		else:
+			print 'Bye.'
+			sys.quit()
+
+	def write_list(self):
+
+		lines_list = []
+		lines_list.append(' SITE NAME              LATITUDE       LONGITUDE\n')
+		lines_list.append(str(self.num_sites) + '\n')
+		for i in range(0,self.num_sites):
+			lines_list.append(self.station_name_list[i] + '                ' + str(self.lat_degrees_list[i]) + '     ' + str(self.lon_degrees_list[i]) + '\n')
+		print 'What will be the filename?'
+		self.answer_filename = raw_input()
+
+		filesave = file(self.answer_filename + '.dat','w')
+		filesave.writelines(lines_list)
+		filesave.close()
+		print('list file is saved at:  ' + os.getcwd())
+
+	def write_param(self):
+		filename_inp = self.answer_filename + '\n'
+		lines_param = ['  File with edifiles names and coordinates [Default: list.dat]=\n']
+		lines_param.append(self.answer_filename + '.dat' + '\n')
+		lines_param.append('  Units for impedances in edi files (M=m/s, F=km/s (=(mV/km/nT) field units), Z=Ohm) [Default: F(km/s)]=\n')
+		lines_param.append('F\n')
+		lines_param.append('  Threshold value for invariants I3 to I7 [range 0 - 1] [Default: 0.15]=\n')
+		lines_param.append('0.150\n')
+		lines_param.append('  Q threshold value [range 0 - 1] [Default: 0.10]=\n')
+		lines_param.append('0.100\n')
+		lines_param.append('  EDI files contain errors (Y/N):\n')
+		lines_param.append('Y\n')
+		lines_param.append('  Using errors in EDI files (Y/N)\n')
+		lines_param.append('Y\n')
+		lines_param.append('  Error percentage=\n')
+		lines_param.append('NA\n')
+		lines_param.append('  Average in bands (Y/N):\n')
+		lines_param.append('Y\n')
+		lines_param.append('  Minimum period to average=\n')
+		lines_param.append('0.100E-02\n')
+		lines_param.append('  Maximum period to average=\n')
+		lines_param.append('0.100E+04\n')
+		lines_param.append('  Number of bands per decade=\n')
+		lines_param.append(' 1.0\n')
+		lines_param.append('  Root name for output files [Default: OUT]=\n')
+		lines_param.append(filename_inp)
+		lines_param.append('  Writing file with all params. and errors (Y/N):\n')
+		lines_param.append('Y\n')
+
+		filesave_param = file('param.cfg','w')
+		filesave_param.writelines(lines_param)
+		filesave_param.close()
+		print('param file is saved at:  ' + os.getcwd())
+
+
+####SCRIPT####
+aaa = conf_waldim()
+aaa.read_edi()
+aaa.write_list()
+aaa.write_param()
+####END OF CODE####

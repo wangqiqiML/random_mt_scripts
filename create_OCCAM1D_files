@@ -1,0 +1,732 @@
+#!/usr/bin/env python
+
+import numpy as np
+import csv
+import os, sys
+import datetime
+
+class OCCAM1D_input(object):
+
+	def __init__(self):
+
+		print 'Creates input files for PW1DI program and executes it.'
+
+		self.edi_list = [os.path.join(os.getcwd(),edi) for edi in os.listdir(os.getcwd()) if edi.find('.edi')>0]
+		self.edi_list.sort()
+
+		print str(len(self.edi_list)) + ' number of edi files are found:'
+		for i in self.edi_list:
+			print i
+
+		print('Do you want to continue ? y/n')
+		answer_cont = raw_input()
+		if answer_cont == 'y':
+			pass
+		else:
+			sys.quit()
+
+		print 'What is the type of input you want to give? Regular(0) , ssq average(1), berdichevskiy average (2)'
+		self.edi_input = raw_input()
+
+		self.mu = 4.0 * np.pi * 10**(-7)  #CGS
+		self.sfac = np.sqrt((4.0*np.pi*(10**(-7))*2.0*np.pi)/5.0)
+
+	def read_edis(self):
+
+		###----------EDI PART----------###
+		#Searching for edi files and appending them to a list.
+		if len(self.edi_list) == 0:
+			print('Warning : There are no edi files in the current direction.')
+			sys.exit()
+		self.edi_list.sort()
+
+		self.file_names = []
+		for i in range(0,len(self.edi_list)):
+			self.file_names.append(self.edi_list[i][self.edi_list[i].rfind('/')+1:-4])
+
+		#Creating empty arrays for information.
+		self.station_lon_list = []
+		self.station_lat_list = []
+		self.lat_degrees_list = []
+		self.lon_degrees_list = []
+		self.station_name_list = []
+		self.station_num = len(self.edi_list)
+		edi_data = []
+		self.title_list = []
+		for i in range(0,self.station_num):
+			self.title_list.append('Station No : ' + str(i + 1))
+		index_freq_list = []
+		index_imp_list = []
+		index_elev_list = []
+
+		index_zxx_r_list = []
+		index_zxx_i_list = []
+		index_zxx_var_list = []
+		index_zxy_r_list = []
+		index_zxy_i_list = []
+		index_zxy_var_list = []
+		index_zyx_r_list = []
+		index_zyx_i_list = []
+		index_zyx_var_list = []
+		index_zyy_r_list = []
+		index_zyy_i_list = []
+		index_zyy_var_list = []
+
+		index_tx_r_list = []
+		index_tx_i_list = []
+		index_ty_r_list = []
+		index_ty_i_list = []
+		index_tipmag_list = []
+
+		self.period_vals = []
+		self.rhoxy_vals = []
+		self.rhoyx_vals = []
+		self.rhoxx_vals = []
+		self.rhoyy_vals = []
+		self.phsxy_vals = []
+		self.phsyx_vals = []
+		self.phsxx_vals = []
+		self.phsyy_vals = []
+
+		self.zxx_r_vals = []
+		self.zxx_i_vals = []
+		self.zxx_var_vals = []
+		self.zxy_r_vals = []
+		self.zxy_i_vals = []
+		self.zxy_var_vals = []
+		self.zyx_r_vals = []
+		self.zyx_i_vals = []
+		self.zyx_var_vals = []
+		self.zyy_r_vals = []
+		self.zyy_i_vals = []
+		self.zyy_var_vals = []
+
+		self.tx_r_vals = []
+		self.tx_i_vals = []
+		self.tx_var_vals = []
+		self.ty_r_vals = []
+		self.ty_i_vals = []
+		self.ty_var_vals = []
+
+		self.elev_global = []
+		self.answer_tipper_list = []
+
+		#Reading in the edis for every station represented by "i" iterative number.
+
+		for i in range(0,self.station_num):
+
+			edi_obj = open(self.edi_list[i],'rb')
+			edi_csv = csv.reader(edi_obj,delimiter = ' ')
+			data_station = []
+			for row in edi_csv:
+				data_station.append(row)
+			edilendata = len(data_station)
+
+			for j in range(0,edilendata):
+				data_station[j] = filter(None,data_station[j])
+
+			data_station = filter(None,data_station)
+
+			edi_data.append(data_station)
+			edilendata = len(data_station)
+
+			index_tx_r = 0
+			self.edi_type = 0
+
+			#Searching for the data positions in individual edi files.
+			for k in range(0,edilendata):
+				if data_station[k][0] == '>FREQ':
+					index_freq = k
+				elif data_station[k][0] == '>!****FREQUENCIES****!':
+					self.edi_type =+ 1
+				elif data_station[k][0][:6] == 'DATAID':
+					index_id = k
+				elif data_station[k][0][:6] == 'REFLAT':
+					index_lat = k
+				elif data_station[k][0][:7] == 'REFLONG':
+					index_long = k
+					if len(data_station[k]) == 1:
+						index_help = 0
+					else:
+						index_help = 1
+				elif data_station[k][0][:7] == 'REFELEV':
+					index_elev = k
+				elif data_station[k][0] == '>ZROT':
+					index_imp = k
+				elif data_station[k][0] == '>ZXXR':
+					index_zxx_r = k
+				elif data_station[k][0] == '>ZXXI':
+					index_zxx_i = k
+				elif data_station[k][0] == '>ZXX.VAR':
+					index_zxx_var = k
+				elif data_station[k][0] == '>ZXYR':
+					index_zxy_r = k
+				elif data_station[k][0] == '>ZXYI':
+					index_zxy_i = k
+				elif data_station[k][0] == '>ZXY.VAR':
+					index_zxy_var = k
+				elif data_station[k][0] == '>ZYXR':
+					index_zyx_r = k
+				elif data_station[k][0] == '>ZYXI':
+					index_zyx_i = k
+				elif data_station[k][0] == '>ZYX.VAR':
+					index_zyx_var = k
+				elif data_station[k][0] == '>ZYYR':
+					index_zyy_r = k
+				elif data_station[k][0] == '>ZYYI':
+					index_zyy_i = k
+				elif data_station[k][0] == '>ZYY.VAR':
+					index_zyy_var = k
+
+				elif data_station[k][0] == '>TXR.EXP':
+					index_tx_r = k
+				elif data_station[k][0] == '>TXI.EXP':
+					index_tx_i = k
+				elif data_station[k][0] == '>TXVAR.EXP':
+					index_tx_var = k
+				elif data_station[k][0] == '>TYR.EXP':
+					index_ty_r = k
+				elif data_station[k][0] == '>TYI.EXP':
+					index_ty_i = k
+				elif data_station[k][0] == '>TYVAR.EXP':
+					index_ty_var = k
+
+
+			if index_tx_r != 0:
+				self.answer_tipper = 'y'
+				self.answer_tipper_list.append(self.answer_tipper)
+			else:
+				self.answer_tipper = 'n'
+				self.answer_tipper_list.append(self.answer_tipper)
+
+			#Acquaring header information
+			self.station_lat_list.append(data_station[index_lat][0][7:])
+			if index_help == 0:
+				self.station_lon_list.append(data_station[index_long][0][8:])
+			else:
+				self.station_lon_list.append(data_station[index_long][1])
+
+			if len(data_station[index_elev]) == 1:
+				ind_equal = data_station[index_elev][0].index('=')
+				self.elev_global.append(float(data_station[index_elev][0][ind_equal+1:]))
+			else:
+				self.elev_global.append(float(data_station[index_elev][1]))
+
+
+			latitude_string_find = [pos for pos, char in enumerate(self.station_lat_list[i]) if char == ':']
+			longitude_string_find = [pos for pos, char in enumerate(self.station_lon_list[i]) if char == ':']
+
+			deg = float(self.station_lat_list[i][0:latitude_string_find[0]])
+			minute = float(self.station_lat_list[i][latitude_string_find[0]+1:latitude_string_find[1]]) / 60.0
+			second = float(self.station_lat_list[i][latitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lat = round(deg - minute - second,5)
+			else:
+				lat = round(deg + minute + second,5)
+			self.lat_degrees_list.append(lat)
+			deg = float(self.station_lon_list[i][0:longitude_string_find[0]])
+			minute = float(self.station_lon_list[i][longitude_string_find[0]+1:longitude_string_find[1]]) / 60.0
+			second = float(self.station_lon_list[i][longitude_string_find[1]+1:]) / 3600.0
+			if deg < 0.0:
+				lon = round(deg - minute - second,5)
+			else:
+				lon = round(deg + minute + second,5)
+			self.lon_degrees_list.append(lon)
+
+			self.station_name_list.append(data_station[index_id][0][8:len(data_station[1][0])-1])
+
+			print('Reading in the edi :' +  str(self.file_names[i]))
+			print '#################################'
+
+			index_freq_list.append(index_freq)
+			index_zxx_r_list.append(index_zxx_r)
+			index_zxx_i_list.append(index_zxx_i)
+			index_zxx_var_list.append(index_zxx_var)
+			index_zxy_r_list.append(index_zxy_r)
+			index_zxy_i_list.append(index_zxy_i)
+			index_zxy_var_list.append(index_zxy_var)
+			index_zyx_r_list.append(index_zyx_r)
+			index_zyx_i_list.append(index_zyx_i)
+			index_zyx_var_list.append(index_zyx_var)
+			index_zyy_r_list.append(index_zyy_r)
+			index_zyy_i_list.append(index_zyy_i)
+			index_zyy_var_list.append(index_zyy_var)
+
+			index_imp_list.append(index_imp)
+
+			frequency_station = []
+			zxx_r_station = []
+			zxx_i_station = []
+			zxx_var_station = []
+			zxy_r_station = []
+			zxy_i_station = []
+			zxy_var_station = []
+			zyx_r_station = []
+			zyx_i_station = []
+			zyx_var_station = []
+			zyy_r_station = []
+			zyy_i_station = []
+			zyy_var_station = []
+
+			#Appending the data to local and global lists.
+			#tinkering the search algorithm for the edi type
+			if self.edi_type > 0:
+				addition_to_search = 1
+			else:
+				addition_to_search = 0
+			#FREQUENCIES
+			for index in range(index_freq_list[i]+1,index_imp_list[i] - addition_to_search):
+				for index2 in data_station[index]:
+					frequency_station.append(float(index2))
+			self.period_vals.append(frequency_station)
+
+			#Calculate the index jump
+			index_jump = index_imp_list[i] - index_freq_list[i] - addition_to_search
+
+			#IMPEDANCES
+
+			for index in range(index_zxx_r_list[i]+1,index_zxx_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_r_station.append(float(index2))
+			self.zxx_r_vals.append(zxx_r_station)
+
+			for index in range(index_zxx_i_list[i]+1,index_zxx_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_i_station.append(float(index2))
+			self.zxx_i_vals.append(zxx_i_station)
+
+			for index in range(index_zxx_var_list[i]+1,index_zxx_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxx_var_station.append(float(index2))
+			self.zxx_var_vals.append(zxx_var_station)
+
+			for index in range(index_zxy_r_list[i]+1,index_zxy_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_r_station.append(float(index2))
+			self.zxy_r_vals.append(zxy_r_station)
+
+			for index in range(index_zxy_i_list[i]+1,index_zxy_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_i_station.append(float(index2))
+			self.zxy_i_vals.append(zxy_i_station)
+
+			for index in range(index_zxy_var_list[i]+1,index_zxy_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zxy_var_station.append(float(index2))
+			self.zxy_var_vals.append(zxy_var_station)
+
+			for index in range(index_zyx_r_list[i]+1,index_zyx_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_r_station.append(float(index2))
+			self.zyx_r_vals.append(zyx_r_station)
+
+			for index in range(index_zyx_i_list[i]+1,index_zyx_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_i_station.append(float(index2))
+			self.zyx_i_vals.append(zyx_i_station)
+
+			for index in range(index_zyx_var_list[i]+1,index_zyx_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyx_var_station.append(float(index2))
+			self.zyx_var_vals.append(zyx_var_station)
+
+			for index in range(index_zyy_r_list[i]+1,index_zyy_r_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_r_station.append(float(index2))
+			self.zyy_r_vals.append(zyy_r_station)
+
+			for index in range(index_zyy_i_list[i]+1,index_zyy_i_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_i_station.append(float(index2))
+			self.zyy_i_vals.append(zyy_i_station)
+
+			for index in range(index_zyy_var_list[i]+1,index_zyy_var_list[i] + index_jump):
+				for index2 in data_station[index]:
+					zyy_var_station.append(float(index2))
+			self.zyy_var_vals.append(zyy_var_station)
+
+
+			#Detecting bad data points indicated w/ large values of impedances
+			period_index = []
+			var_index = []
+			for j in range(0,len(self.period_vals[i])):
+
+				if self.zxx_r_vals[i][j] > 1e10:
+					period_index.append(self.period_vals[i][j])
+					var_index.append(j)
+			var_index = var_index[::-1]
+
+			#remove from list local function
+			def remove_from_list(the_list,val):
+				while val in the_list:
+					the_list.remove(val)
+
+			for period_element in period_index:
+				remove_from_list(self.period_vals[i],period_element)
+
+			for var_element in var_index:
+				del self.zxx_r_vals[i][var_element]
+				del self.zxx_i_vals[i][var_element]
+				del self.zxx_var_vals[i][var_element]
+				del self.zxy_r_vals[i][var_element]
+				del self.zxy_i_vals[i][var_element]
+				del self.zxy_var_vals[i][var_element]
+				del self.zyx_r_vals[i][var_element]
+				del self.zyx_i_vals[i][var_element]
+				del self.zyx_var_vals[i][var_element]
+				del self.zyy_r_vals[i][var_element]
+				del self.zyy_i_vals[i][var_element]
+				del self.zyy_var_vals[i][var_element]
+
+	def select_freq(self):
+
+		from scipy.interpolate import Akima1DInterpolator
+
+		print('Enter the array of frequencies as in [entry1, entry2, entry3, ... ]')
+		self.approx_array = input()
+
+		self.approx_array_list = []
+
+		self.zxx_r_vals_interp = []
+		self.zxy_r_vals_interp = []
+		self.zyx_r_vals_interp = []
+		self.zyy_r_vals_interp = []
+
+		self.zxx_i_vals_interp = []
+		self.zxy_i_vals_interp = []
+		self.zyx_i_vals_interp = []
+		self.zyy_i_vals_interp = []
+
+		self.index_periods_global = []
+		self.period_vals_interp = []
+
+		for i in range(0,self.station_num):
+			self.approx_arrayy = []
+			for j in range(0,len(self.approx_array)):
+				self.approx_arrayy.append(self.approx_array[j])
+			self.approx_array_list.append(self.approx_arrayy)
+
+		for i in range(0,self.station_num):
+			for element in self.approx_array:
+				if (element < min(self.period_vals[i])) or ((element > max(self.period_vals[i]))):
+					del self.approx_array_list[i][self.approx_array_list[i].index(element)]
+
+
+		for i in range(0,self.station_num):
+
+			f_zxx_r = Akima1DInterpolator(self.period_vals[i],self.zxx_r_vals[i])
+			f_zxy_r = Akima1DInterpolator(self.period_vals[i],self.zxy_r_vals[i])
+			f_zyx_r = Akima1DInterpolator(self.period_vals[i],self.zyx_r_vals[i])
+			f_zyy_r = Akima1DInterpolator(self.period_vals[i],self.zyy_r_vals[i])
+
+			f_zxx_i = Akima1DInterpolator(self.period_vals[i],self.zxx_i_vals[i])
+			f_zxy_i = Akima1DInterpolator(self.period_vals[i],self.zxy_i_vals[i])
+			f_zyx_i = Akima1DInterpolator(self.period_vals[i],self.zyx_i_vals[i])
+			f_zyy_i = Akima1DInterpolator(self.period_vals[i],self.zyy_i_vals[i])
+
+
+			self.zxx_r_vals_interp.append(f_zxx_r(self.approx_array_list[i]))
+			self.zxx_i_vals_interp.append(f_zxx_i(self.approx_array_list[i]))
+			self.zyx_r_vals_interp.append(f_zyx_r(self.approx_array_list[i]))
+			self.zyx_i_vals_interp.append(f_zyx_i(self.approx_array_list[i]))
+
+			self.zxy_r_vals_interp.append(f_zxy_r(self.approx_array_list[i]))
+			self.zxy_i_vals_interp.append(f_zxy_i(self.approx_array_list[i]))
+			self.zyy_r_vals_interp.append(f_zyy_r(self.approx_array_list[i]))
+			self.zyy_i_vals_interp.append(f_zyy_i(self.approx_array_list[i]))
+			self.index_periods_global.append(range(0,len(self.approx_array_list[i])))
+			self.period_vals_interp.append(self.approx_array_list[i])
+
+
+		self.zxx_r_vals = self.zxx_r_vals_interp
+		self.zxx_i_vals = self.zxx_i_vals_interp
+		self.zxy_r_vals = self.zxy_r_vals_interp
+		self.zxy_i_vals = self.zxy_i_vals_interp
+		self.zyx_r_vals = self.zyx_r_vals_interp
+		self.zyx_i_vals = self.zyx_i_vals_interp
+		self.zyy_r_vals = self.zyy_r_vals_interp
+		self.zyy_i_vals = self.zyy_i_vals_interp
+		self.period_vals = self.period_vals_interp
+
+		self.total_freq_num = len(self.approx_array)
+		self.new_periods_write = self.approx_array
+
+		for i in range(0,len(self.period_vals)):
+			###CALCULATING APP. RES AND PHASE VALUES
+
+			freqnumber = len(self.period_vals[i])
+			rhoxy_station = []
+			rhoxyerr_station = []
+			rhoyx_station = []
+			rhoyxerr_station = []
+			rhoxx_station = []
+			rhoxxerr_station = []
+			rhoyy_station = []
+			rhoyyerr_station = []
+			phsxy_station = []
+			phsxyerr_station = []
+			phsyx_station = []
+			phsyxerr_station = []
+			phsxx_station = []
+			phsxxerr_station = []
+			phsyy_station = []
+			phsyyerr_station = []
+
+			for j in range(0,freqnumber):
+
+				rhoxx_station.append(((self.sfac*self.zxx_r_vals[i][j])**2.0 + (self.sfac*self.zxx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoxy_station.append(((self.sfac*self.zxy_r_vals[i][j])**2.0 + (self.sfac*self.zxy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoyx_station.append(((self.sfac*self.zyx_r_vals[i][j])**2.0 + (self.sfac*self.zyx_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+				rhoyy_station.append(((self.sfac*self.zyy_r_vals[i][j])**2.0 + (self.sfac*self.zyy_i_vals[i][j])**2.0) / (2.0 * np.pi * self.mu * self.period_vals[i][j]))
+
+				phsxx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxx_i_vals[i][j]) / (self.sfac*self.zxx_r_vals[i][j]))))
+				phsxy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zxy_i_vals[i][j]) / (self.sfac*self.zxy_r_vals[i][j]))))
+				phsyx_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyx_i_vals[i][j]) / (self.sfac*self.zyx_r_vals[i][j]))))
+				phsyy_station.append((180.0 / np.pi) * (np.arctan((self.sfac*self.zyy_i_vals[i][j]) / (self.sfac*self.zyy_r_vals[i][j]))))
+
+
+			self.rhoxx_vals.append(rhoxx_station)
+			self.rhoxy_vals.append(rhoxy_station)
+			self.rhoyx_vals.append(rhoyx_station)
+			self.rhoyy_vals.append(rhoyy_station)
+
+			self.phsxx_vals.append(phsxx_station)
+			self.phsxy_vals.append(phsxy_station)
+			self.phsyx_vals.append(phsyx_station)
+			self.phsyy_vals.append(phsyy_station)
+
+		print 'Enter the errors for apparent resistivities'
+		self.error_app = input()
+		print 'Enter the errors for phases'
+		self.error_phase = input()
+
+	def calc_ssq_imp(self):
+
+		self.period_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zxx_r_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zxx_i_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zxy_r_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zxy_i_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zyx_r_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zyx_i_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zyy_r_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+		self.zyy_i_matrix = np.zeros([len(self.approx_array), len(self.edi_list)])
+
+		for i in range(0,len(self.period_vals)):
+			for j in range(0,len(self.period_vals[i])):
+				if self.period_vals[i][j] in self.approx_array:
+					self.period_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.period_vals[i][j]
+					self.zxx_r_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zxx_r_vals[i][j]
+					self.zxx_i_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zxx_i_vals[i][j]
+					self.zxy_r_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zxy_r_vals[i][j]
+					self.zxy_i_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zxy_i_vals[i][j]
+					self.zyx_r_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zyx_r_vals[i][j]
+					self.zyx_i_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zyx_i_vals[i][j]
+					self.zyy_r_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zyy_r_vals[i][j]
+					self.zyy_i_matrix[self.approx_array.index(self.period_vals[i][j])][i] = self.zyy_i_vals[i][j]
+		self.z_ssq_matrix = np.zeros([len(self.approx_array), len(self.edi_list)], dtype = complex)
+		self.z_det_matrix = np.zeros([len(self.approx_array), len(self.edi_list)], dtype = complex)
+		self.n_ssq_matrix = np.zeros(len(self.approx_array))
+		self.z_ssq_reg = np.zeros(len(self.approx_array), dtype = complex)
+		self.z_det_reg = np.zeros(len(self.approx_array), dtype = complex)
+		#Calculate SSQ
+		for i in range(0,len(self.period_matrix)):
+			n = 0
+			for j in range(0,len(self.period_matrix[i])):
+				if self.period_matrix[i][j] != 0.0:
+					self.z_ssq_matrix[i][j] = np.sqrt(((self.zxx_r_matrix[i][j] + self.zxx_i_matrix[i][j]*1j)**2.0 + (self.zxy_r_matrix[i][j] + self.zxy_i_matrix[i][j]*1j)**2.0 + \
+					(self.zyx_r_matrix[i][j] + self.zyx_i_matrix[i][j]*1j)**2.0 + (self.zyy_r_matrix[i][j] + self.zyy_i_matrix[i][j]*1j)**2.0) / 2.0)
+					self.z_det_matrix[i][j] = np.sqrt((self.zxx_r_matrix[i][j] + self.zxx_i_matrix[i][j]*1j) * (self.zyy_r_matrix[i][j] + self.zyy_i_matrix[i][j]*1j) -\
+						(self.zxy_r_matrix[i][j] + self.zxy_i_matrix[i][j]*1j) * (self.zyx_r_matrix[i][j] + self.zyx_i_matrix[i][j]*1j))
+					n = n + 1
+			self.n_ssq_matrix[i] = n
+			self.z_ssq_reg[i] = np.sum(self.z_ssq_matrix[i]) / self.n_ssq_matrix[i]
+			self.z_det_reg[i] = np.sum(self.z_det_matrix[i]) / self.n_ssq_matrix[i]
+
+
+		self.rho_ssq_reg = (self.sfac**2.0 * np.abs(self.z_ssq_reg)**2.0) / (2.0 * np.pi * self.mu * np.asarray(self.approx_array))
+		self.phase_ssq_reg = (180.0 / np.pi) * (np.arctan((self.sfac*np.imag(self.z_ssq_reg)) / (self.sfac*np.real(self.z_ssq_reg))))
+
+		self.rho_det_reg = (self.sfac**2.0 * np.abs(self.z_det_reg)**2.0) / (2.0 * np.pi * self.mu * np.asarray(self.approx_array))
+		self.phase_det_reg = (180.0 / np.pi) * (np.arctan((self.sfac*np.imag(self.z_det_reg)) / (self.sfac*np.real(self.z_det_reg))))
+
+	def write_data(self):
+
+		if self.edi_input == '0':
+			pass
+		elif self.edi_input == '1':
+			aaa.calc_ssq_imp()
+
+			self.input_resistivity = self.rho_ssq_reg
+			self.input_phase = self.phase_ssq_reg
+			self.station_num = 1
+			self.file_names = ['SSQ_Average']
+			self.header_line = 'ssq_average'
+		elif self.edi_input == '2':
+			aaa.calc_ssq_imp()
+
+			self.input_resistivity = self.rho_det_reg
+			self.input_phase = self.phase_det_reg
+			self.station_num = 1
+			self.header_line = 'det_average'
+			self.file_names = ['DET_Average']
+
+		self.error_appres = (self.error_app/100.0) * self.input_resistivity
+		self.error_phase = (self.error_phase/100.0) * self.input_phase
+
+		dat_lines = ['Format:  EMData_1.1\n']
+		dat_lines.append('# Transmitters:    1\n')
+		dat_lines.append('  0 0 -100000 0 0\n')
+		dat_lines.append('# Frequencies:     ' + str(len(self.approx_array)) + '\n')
+		for i in range(0,len(self.approx_array)):
+			dat_lines.append('     ' + '%.5E' % self.approx_array[i] + '\n' )
+
+		dat_lines.append('Phase Convention: lag\n')
+		dat_lines.append('# Receivers:      1\n')
+		dat_lines.append('!            X            Y            Z        Theta        Alpha         Beta\n')
+		dat_lines.append('             0            0            0            0            0            0 \n')
+		data_num = len(self.rho_ssq_reg) + len(self.phase_ssq_reg)
+		dat_lines.append('# Data:     ' + str(int(data_num)) + '\n')
+		dat_lines.append('!         Type        Freq#        Tx#           Rx#       Data 	  Std_Error\n')
+		for i in range(0,len(self.rho_ssq_reg)):
+			dat_lines.append('         103         ' + str(i+1) + '         1         1    ' + str(np.log10(self.rho_ssq_reg[i])) +\
+			'    ' + str(np.log10(self.error_appres[i])) + '\n')
+			dat_lines.append('         104         ' + str(i+1) + '         1         1    ' + str(self.phase_ssq_reg[i]) +\
+			'    ' + str(self.error_phase[i]) + '\n')
+
+		dat_file = open(os.getcwd() + '/' + 'MT_ssq.data','w')
+		dat_file.writelines(dat_lines)
+		dat_file.close()
+		print 'Data file is written at : ' + os.getcwd() + ' as MT_ssq.data'
+
+	def write_model(self):
+
+		print 'Create a model space that applies incremental layering from first layer(0) or a cutoff layer (1), manual (2)?'
+		type_layer = raw_input()
+		if type_layer == '0':
+			print 'What is the number of layers in the model space?'
+			layer_inp = int(raw_input())
+			print 'What is the thickness of the first layer?'
+			layer_thickness = float(raw_input())
+			print 'Enter the increment factor of the layering.'
+			layer_increment = float(raw_input())
+
+
+			self.z_layering = []
+
+			for i in range(0,layer_inp):
+				if i == 0:
+					self.z_layering.append(layer_thickness)
+				else:
+					self.z_layering.append(self.z_layering[i-1] * layer_increment)
+
+
+
+		elif type_layer == '1':
+			print 'What is the evenly spaced layers cutoff'
+			layer_cutoff = int(raw_input())
+			print 'What is the thickness of the first layer?'
+			layer_thickness = float(raw_input())
+			print 'Enter the increment factor for the layering'
+			layer_increment = float(raw_input())
+			print 'Enter the spacings for evenly distributed part of the mesh (Should be better if it were to be divisable by cutoff'
+			layer_spacing = int(raw_input())
+			print 'How many layers after the evenly spaced section?'
+			layer_spaceing_after = int(raw_input())
+
+			self.z_layering = [layer_thickness]
+
+			for i in range(1,layer_cutoff):
+				if (i % layer_spacing == 0):
+					self.z_layering.append(self.z_layering[i-1] * layer_increment)
+				else:
+					self.z_layering.append(self.z_layering[i-1])
+			for i in range(layer_cutoff,layer_cutoff+layer_spaceing_after):
+				self.z_layering.append(self.z_layering[i-1] * layer_increment)
+
+		elif type_layer == '2':
+			self.z_layering = []
+			while True:
+				print 'All layers for now:'
+				print self.z_layering
+				print 'Add a layer thickness to exit type 000'
+				layer_thickness = raw_input()
+				if layer_thickness == '000':
+					break
+				else:
+					print 'How many times this layer will be repeated'
+					layer_repeat = int(input())
+					if layer_repeat > 1 :
+						for i in range(layer_repeat):
+							self.z_layering.append(float(layer_thickness))
+					elif layer_repeat == 1:
+						self.z_layering.append(float(layer_thickness))
+
+
+		self.z_layering = np.asarray(self.z_layering)
+		self.z_layering_cum = np.cumsum(self.z_layering)
+
+		print self.z_layering_cum
+
+		print 'Enter the resistivities of the half-space'
+		hs_res = float(raw_input())
+
+		model_lines = ['Format: Resistivity1DMod_1.0\n']
+		model_lines.append('#LAYERS:     ' + str(len(self.z_layering_cum) + 2)  + '\n')
+		model_lines.append('! [top_depth 	resistivity  penalty	prejudice   prej_penalty]\n')
+		model_lines.append('   -100000       1e+12          0          0             0         \n')
+		model_lines.append('      0          ?           0          0             0\n')
+		for i in range(0,len(self.z_layering_cum)):
+			model_lines.append('      ' + '%.5E' % (self.z_layering_cum[i] * 1000.0) + '    ?    1    0    0\n')
+
+		model_file = open(os.getcwd() + '/' + 'model','w')
+		model_file.writelines(model_lines)
+		model_file.close()
+		print 'Model file is written at : '+ os.getcwd() + ' as model'
+
+	def write_startup(self):
+
+
+		startup_line = ['Format:             OCCAMITER_FLEX\n']
+		startup_line.append('Description:        ' + 'something\n')
+		startup_line.append('Model File:         ' + 'model\n')
+		startup_line.append('Data File:          ' + 'MT_ssq.data\n')
+		startup_line.append('Date/Time:          ' + datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S') + '\n')
+		startup_line.append('Iterations to run:  ' + '100\n')
+		startup_line.append('Target Misfit:      ' + '1.0\n')
+		startup_line.append('Roughness Type:     ' + '1\n')
+		startup_line.append('Debug Level:        1\n')
+		startup_line.append('Iteration:          0\n')
+		startup_line.append('Lagrange Value:     5.00000\n')
+		startup_line.append('Roughness Value:    0.1000E+8\n')
+		startup_line.append('Misfit Value:       100.0000\n')
+		startup_line.append('Misfit Reached:     0\n')
+		startup_line.append('Param Count:        ' + str(len(self.z_layering_cum) + 1) + '\n')
+		dums = []
+		for i in range(0,len(self.z_layering_cum)+1):
+			if (i+1)%4 == 0 and i != 0:
+				dums.append('0.000000')
+				dums.append('  \n')
+			elif i == len(self.z_layering_cum):
+				dums.append('0.000000')
+				dums.append('  \n')
+			else:
+				dums.append('0.000000')
+				dums.append('  ')
+		dumlines = ''.join(dums)
+		startup_line.append(dumlines)
+
+		startup_file = open(os.getcwd() + '/' + 'startup','w')
+		startup_file.writelines(startup_line)
+		startup_file.close()
+
+		print 'Model file is written at : '+ os.getcwd() + ' as startup'
+
+
+aaa = OCCAM1D_input()
+aaa.read_edis()
+aaa.select_freq()
+aaa.calc_ssq_imp()
+aaa.write_data()
+aaa.write_model()
+aaa.write_startup()
