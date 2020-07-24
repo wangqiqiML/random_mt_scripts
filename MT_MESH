@@ -1152,9 +1152,8 @@ class MT_MESH_3D(object):
 	def read_topog_data(self):
 
 		print 'What is the full filepath to the .xyz file?'
-		#self.topog_file_path = raw_input()
-		self.topo_file_path = "/home/sinan/Desktop/Research/South_Africa/Data/grassdem/etopo_crop_avg_11.xyz"
-
+		self.topog_file_path = raw_input()
+		
 		print 'Reading the topography data.'
 
 		self.topo_file_obj = open(self.topo_file_path, 'rb')
