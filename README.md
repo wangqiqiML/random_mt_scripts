@@ -1,7 +1,8 @@
 # random_mt_scripts
 
 Some scripts I use in MT data processing and modeling. I hope these could be useful for other people as well.
-Most of them are spaghetti codes written in python but they are working. Do not expect elegance :P
+Most of them are spaghetti codes written in python but they are working. Do not expect elegance :P. Most of them
+uses Python2 rather than 3.
 
 ***MT_MESH***
 
@@ -15,9 +16,10 @@ Can do:
 
 ***SENSE_WS***
 
-Run it in the same folder with the rho, dat files.
+Run it in the same folder with the rho, dat files (ModEM).
 
-Edit existing rho files with the assit of indexed plots. 
+Edit existing rho files with the assist of indexed plots. 
+Could be used for making sensitivity tests
 
 ***avg_edi***
 
