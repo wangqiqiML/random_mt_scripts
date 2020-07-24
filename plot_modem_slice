@@ -1,0 +1,292 @@
+#!/usr/bin/env python3
+
+import os,sys,csv,decimal,itertools
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.colors as colors
+import matplotlib.cbook as cbook
+import matplotlib.patches as patches
+from matplotlib.collections import PatchCollection
+
+
+cm_data = np.loadtxt('/home/sinan/src/ScientificColourMaps5/vik/vik.txt')
+color_map = colors.LinearSegmentedColormap.from_list('vik',cm_data)
+color_map = color_map.reversed()
+
+#color_map = 'jet_r'
+
+class plot_modem_slice(object):
+
+	def __init__(self):
+
+		print('What is the core filename for the dat and rho file?')
+		self.core_filename = str(input())
+		self.ModEM_model_file_name = os.getcwd() + '/' + self.core_filename + '.rho'
+		self.ModEM_data_file_name = os.getcwd() + '/' + self.core_filename + '.dat'
+
+		self.slices_depth = []
+		while True:
+
+			print('Enter the depths of the slices to be plotted. Type exit to finish...')
+			print(self.slices_depth)
+			slice = input()
+			if slice != 'exit':
+				self.slices_depth.append(float(slice))
+			else:
+				break
+
+		print('Enter the distance for bounding from northern and southernmost stations to plot')
+		self.distance_from_x = float(input())
+		print('Enter the distance for bounding from western and easternmost stations to plot')
+		self.distance_from_y = float(input())
+		while True:
+			print('Do you want to plot stations as well?y/n')
+			self.station_answer = str(input())
+			if (self.station_answer == 'y') or (self.station_answer == 'n'):
+				break
+			else:
+				print('Please provide a valid answer y/n')
+
+		while True:
+			print('Do you want to plot the axes?y/n')
+			self.ax_grid_answer = str(input())
+			if (self.ax_grid_answer == 'y') or (self.ax_grid_answer == 'n'):
+				break
+			else:
+				print('Please provide a valid answer y/n')
+
+		while True:
+			print('Do you want to save the files (1) or just plot them (2)? ')
+			self.plot_answer = str(input())
+			if (self.plot_answer == '1') or (self.plot_answer == '2'):
+				break
+			else:
+				print('Please provide a valid answer 1 or 2')
+
+		self.read_rho()
+		self.read_dat()
+
+		for self.i in range(0,len(self.slices_depth)):
+
+			self.idx_depth = (np.abs(np.asarray(self.z_mesh_center)-self.slices_depth[self.i])).argmin()
+			self.plot_slices()
+
+		self.write_points_file()
+
+
+	def read_csv(self,filename,delim):
+
+		#Simple function for reading csv files and give out filtered output for given delimiter (delim)
+
+		file_obj = open(filename,'rt',encoding = "utf8") #Creating file object
+		file_csv = csv.reader(file_obj,delimiter = delim) #Reading the file object with csv module, delimiter assigned to ','
+		data = [] #Creating empty array to append data
+
+		#Appending data from csb object
+		for row in file_csv:
+			data.append(row)
+
+		#Filtering data for None elements read.
+		for j in range(0,len(data)):
+			data[j] = list(filter(None,data[j]))
+		data = list(filter(None,data))
+
+		return data
+
+	def read_rho(self):
+
+		self.ModEM_rho_data = self.read_csv(self.ModEM_model_file_name, delim = ' ')
+
+		self.x_num = int(self.ModEM_rho_data[1][0])
+		self.y_num = int(self.ModEM_rho_data[1][1])
+		self.z_num = int(self.ModEM_rho_data[1][2])
+
+		self.x_grid = np.asarray(self.ModEM_rho_data[2]).astype(np.float)
+		self.y_grid = np.asarray(self.ModEM_rho_data[3]).astype(np.float)
+		self.z_grid = np.asarray(self.ModEM_rho_data[4]).astype(np.float)
+
+		self.lenxgrid = len(self.x_grid)
+		self.lenygrid = len(self.y_grid)
+		self.lenzgrid = len(self.z_grid)
+
+		self.rho = []
+
+		for k in range(5,len(self.ModEM_rho_data) - 2 ,self.y_num):
+			rhoy = []
+			for z in range(k, k + self.y_num):
+				rhox = []
+				for l in range(0,self.x_num):
+					rhox.append(float(self.ModEM_rho_data[z][l]))
+				rhoy.append(rhox)
+
+			self.rho.append(rhoy)
+
+		self.rho = np.exp(np.asarray(self.rho))
+
+		self.z_depth = np.array([0.0])
+		self.z_grid = np.cumsum(self.z_grid)
+		self.z_depth = np.append(self.z_depth,self.z_grid)
+		self.z_mesh_center = []
+		for i in range(1,len(self.z_depth)):
+			self.z_mesh_center.append((((self.z_depth[i] - self.z_depth[i-1]) / 2.0) + self.z_depth[i-1]) / 1000.0)
+
+		self.x_grid_cum = []
+		self.y_grid_cum = []
+		self.mid_point_x = int(len(self.x_grid) / 2.0)
+		self.mid_point_y = int(len(self.y_grid) / 2.0)
+
+		if len(self.x_grid) %2 == 0:
+			self.mid_point_x = int(len(self.x_grid) / 2.0)
+			beg_x = np.sum(self.x_grid[:self.mid_point_x]) * -1
+
+		elif len(self.x_grid) %2 != 0:
+			self.mid_point_x = int(len(self.x_grid) / 2.0) + 1
+			beg_x = np.sum(self.x_grid[:self.mid_point_x]) * -1 + (self.x_grid[self.mid_point_x] / 2.0)
+
+		if len(self.y_grid) %2 == 0:
+			self.mid_point_y = int(len(self.y_grid) / 2.0)
+			beg_y = np.sum(self.y_grid[:self.mid_point_y]) * -1
+		elif len(self.y_grid) %2 != 0:
+			self.mid_point_y = int(len(self.y_grid) / 2.0) + 1
+			beg_y = np.sum(self.y_grid[:self.mid_point_y]) * -1 + (self.y_grid[self.mid_point_y] / 2.0)
+
+		self.x_grid_cum.append(beg_x)
+		for i in range(0,self.lenxgrid-1):
+			beg_x += self.x_grid[i]
+			self.x_grid_cum.append(beg_x)
+		self.y_grid_cum.append(beg_y)
+		for i in range(0,self.lenygrid-1):
+			beg_y += self.y_grid[i]
+			self.y_grid_cum.append(beg_y)
+
+		self.rectobj_list = []
+		x1list = []
+		self.x_grid_cum = self.x_grid_cum[::-1]
+		self.x_grid = self.x_grid[::-1]
+		for i in range(0,len(self.y_grid_cum)):
+			for j in range(0,len(self.x_grid_cum)):
+				x1 = self.y_grid_cum[i]
+				y1 = self.x_grid_cum[j]
+				x1list.append(x1)
+				rectobj = patches.Rectangle((x1,y1),self.y_grid[i],self.x_grid[j])
+				self.rectobj_list.append(rectobj)
+
+		self.min_x_grid_cum = np.amin(self.x_grid_cum)
+		self.max_x_grid_cum = np.amax(self.x_grid_cum)
+		self.min_y_grid_cum = np.amin(self.y_grid_cum)
+		self.max_y_grid_cum = np.amax(self.y_grid_cum)
+
+		#Creating x and y mesh centers to find the profile locations
+
+		self.x_mesh_center = []
+		self.y_mesh_center = []
+
+		for i in range(1,len(self.x_grid_cum)):
+			self.x_mesh_center.append(((self.x_grid_cum[i] - self.x_grid_cum[i-1]) / 2.0) + self.x_grid_cum[i-1])
+		for i in range(1,len(self.y_grid_cum)):
+			self.y_mesh_center.append(((self.y_grid_cum[i] - self.y_grid_cum[i-1]) / 2.0) + self.y_grid_cum[i-1])
+
+		self.z_number = self.z_num
+
+	def read_dat(self):
+
+		#Reading ModEM dat file to get coordinates of stations and model centre.
+
+		self.ModEM_dat_data = self.read_csv(self.ModEM_data_file_name,delim = ' ')
+
+		self.station_lat = []
+		self.station_lon = []
+		self.station_name = []
+		self.station_posx = []
+		self.station_posy = []
+
+		self.mc_lat = float(self.ModEM_dat_data[6][1])
+		self.mc_lon = float(self.ModEM_dat_data[6][2])
+
+		dash_found = False
+
+		for row in range(8,len(self.ModEM_dat_data)):
+		    if self.ModEM_dat_data[row][0] == '#' :
+		        limitlines = row-1
+		        dash_found = True
+
+		if dash_found == False:
+			limitlines = len(self.ModEM_dat_data)
+
+		for row in range(8,limitlines):
+			if self.ModEM_dat_data[row][1] != self.ModEM_dat_data[row-1][1]:
+				self.station_name.append(self.ModEM_dat_data[row][1])
+				self.station_lat.append(float(self.ModEM_dat_data[row][2]))
+				self.station_lon.append(float(self.ModEM_dat_data[row][3]))
+				self.station_posx.append(float(self.ModEM_dat_data[row][4]))
+				self.station_posy.append(float(self.ModEM_dat_data[row][5]))
+
+		self.ModEM_dat_read = True
+		self.res_profile_plot_list = []
+		self.res_profile_max_plot_list = []
+		self.res_profile_min_plot_list = []
+
+		self.st_item_list = []
+
+		for i in range(0,len(self.station_name)):
+
+			self.st_item_list.append(str(i) + ' - ' + self.station_name[i])
+
+		self.max_x = max(self.station_posx) + (self.distance_from_x * 1000.0)
+		self.min_x = min(self.station_posx) - (self.distance_from_x * 1000.0)
+		self.max_y = max(self.station_posy) + (self.distance_from_y * 1000.0)
+		self.min_y = min(self.station_posy) - (self.distance_from_y * 1000.0)
+
+
+	def plot_slices(self):
+
+		self.mt_fig = plt.figure(figsize = (10,7))
+		self.ax_mt = plt.subplot(111)
+
+		#Finding the index of the wanted depth.
+
+		res_array = np.asarray(list(itertools.chain(*self.rho[self.idx_depth])))
+
+		p = PatchCollection(self.rectobj_list,linewidth = 1,norm=colors.LogNorm())
+		p.set_array(res_array)
+		p.set_cmap(color_map)
+		p.set_clim([1,1e4])
+
+		self.ax_mt.add_collection(p)
+		self.ax_mt.set_xlabel('Longitude')
+		self.ax_mt.set_ylabel('Latitude')
+		self.ax_mt.tick_params(axis='both', which='major', labelsize=8)
+		self.ax_mt.grid(which = 'both')
+		self.ax_mt.set_xlim((self.min_y,self.max_y))
+		self.ax_mt.set_ylim((self.min_x,self.max_x))
+
+		if self.station_answer == 'y':
+
+			self.ax_mt.scatter(self.station_posy,self.station_posx,marker = 'v',color = 'k',s = 1.5)
+		transparent_answer = True
+		if self.ax_grid_answer == 'y':
+			transparent_answer = False
+			self.ax_mt.set_xlabel('Easting')
+			self.ax_mt.set_ylabel('Northing')
+			self.ax_mt.set_title('Depth = ' + str(self.slices_depth[self.i]) + ' km')
+			plt.colorbar(p,label = 'Log Resistivity')
+		else:
+			self.ax_mt.grid(None)
+			self.ax_mt.axis('off')
+
+		if self.plot_answer == '1':
+			plt.savefig(self.core_filename + 'DepthSlice' + str(self.slices_depth[self.i]) + 'km.png',dpi = 300,transparent = transparent_answer)
+			print('Saved the file ' + 'DepthSlice' + str(self.slices_depth[self.i]) + 'km.png' + 'in directory' + os.getcwd())
+		elif self.plot_answer == '2':
+			plt.show()
+
+	def write_points_file(self):
+
+		lines = ['North = ' + str(self.max_x)+'\n','South = ' + str(self.min_x) + '\n','East = ' + str(self.max_y) + '\n','West = ' + str(self.min_y) + '\n']
+
+		filesave_comp = open(self.core_filename + '_georeference.txt' ,'w')
+		filesave_comp.writelines(lines)
+		filesave_comp.close()
+
+aaa = plot_modem_slice()
