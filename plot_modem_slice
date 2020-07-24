@@ -10,11 +10,11 @@ import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
 
 
-cm_data = np.loadtxt('/home/sinan/src/ScientificColourMaps5/vik/vik.txt')
-color_map = colors.LinearSegmentedColormap.from_list('vik',cm_data)
-color_map = color_map.reversed()
+#cm_data = np.loadtxt('/home/sinan/src/ScientificColourMaps5/vik/vik.txt')
+#color_map = colors.LinearSegmentedColormap.from_list('vik',cm_data)
+#color_map = color_map.reversed()
 
-#color_map = 'jet_r'
+color_map = 'jet_r'
 
 class plot_modem_slice(object):
 
